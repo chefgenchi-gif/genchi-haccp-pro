@@ -307,4 +307,12 @@ render=function(){
   for(const ricetta of ricette)aggiungiFotoRicetta(contenitore,ricetta,window.fgFotoRicetta);
 };
 if(['Reparto','Categoria','Ricette e procedure'].includes(active))render();
+</script><script type="module">
+import { aggiungiAccessiRapidi } from './modules/accessi-rapidi.mjs';
+const renderPrimaDegliAccessiRapidi=render;
+render=function(){
+  renderPrimaDegliAccessiRapidi();
+  if(active==='Home')aggiungiAccessiRapidi($('panel'),go);
+};
+if(active==='Home')render();
 </script></html>
