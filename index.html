@@ -143,7 +143,7 @@ render=function(){if(active==='Qualificazione fornitori'){supplierView();return}
 const warehousePrior=render;
 const fishSubs=['Pesce di mare','Pesce di acqua dolce','Crostacei','Cefalopodi','Bivalvi','Gasteropodi','Uova e caviale','Da classificare'];
 function warehouseGroup(r){return r.data.Sottocategoria||smartClass(r.data.Prodotto||'').sub||'Da classificare'}
-function warehouseCards(rows){return rows.map(r=>`<div class="record"><b>${esc(r.data.Prodotto)}</b> · ${esc(status(r))}<br>Stato: ${esc(r.data['Stato fisico']||'Da verificare')}<br>Lotto: ${esc(r.data['Lotto fornitore'])} · Scadenza: ${esc(r.data.Scadenza)}<br>Fornitore: ${esc(r.data.Fornitore)}<br>Entrata: ${receiptQty(r)} ${esc(receiptUnit(r))} · Residuo: ${stock(r).toFixed(3)} ${esc(receiptUnit(r))}<br>Prezzo: € ${receiptPrice(r)}/${esc(receiptUnit(r))}</div>`).join('')||'<p>Nessun lotto in giacenza.</p>'}
+function warehouseCards(rows){return rows.map(r=>`<div class="record"><b>${esc(r.data.Prodotto)}</b> · ${esc(status(r))}<br>Stato: ${esc(r.data['Stato fisico']||'Da verificare')}<br>Lotto: ${esc(r.data['Lotto fornitore'])} · Scadenza: ${esc(r.data.Scadenza)}<br>Fornitore: ${esc(r.data.Fornitore)}<br><b>Giacenza attuale: ${stock(r).toFixed(3)} ${esc(receiptUnit(r))}</b> · Carico iniziale: ${receiptQty(r)} ${esc(receiptUnit(r))}<br>Prezzo: € ${receiptPrice(r)}/${esc(receiptUnit(r))}</div>`).join('')||'<p>Nessun lotto in giacenza.</p>'}
 render=function(){warehousePrior();if(active==='Cella'){let rows=inventory().filter(r=>locationOf(r)===place);let groups=/pesce/i.test(place)?fishSubs:[...new Set(rows.map(warehouseGroup))];$('archive').innerHTML='<h2>Giacenze della cartella</h2>'+groups.map(g=>`<details><summary><b>${esc(g)}</b> (${rows.filter(r=>warehouseGroup(r)===g).length} lotti)</summary>${warehouseCards(rows.filter(r=>warehouseGroup(r)===g))}</details>`).join('')+(!groups.length?warehouseCards(rows):'');}if(active==='SMART SCAN'){$('panel').lastElementChild.textContent='Classificare, verificare ogni lotto e confermare il carico. Unità supportate: kg, g, l, ml, pezzi, confezioni e cartoni. Prezzo per unità indicata.';}};
 smartPreview=function(){let rows=$('smartText').value.split('\n').filter(x=>x.trim()).map(x=>x.split(';').map(y=>y.trim()));let opts=(a,v)=>a.map(x=>`<option ${x===v?'selected':''}>${esc(x)}</option>`).join('');$('smartRows').innerHTML=rows.length?`<form id="batchStock"><label>Operatore<input name="operator" required></label><label>Tipo documento<select name="kind"><option>DDT</option><option>Fattura</option></select></label>${rows.map(([n,q,u,p],i)=>{let c=smartClass(n),state=c.state==='Surgelato'?'Congelato':c.state,loc=smartDestination(c.cat,c.state);return `<fieldset data-row><legend>${esc(n)}</legend><label>Prodotto<input name="product" value="${esc(n)}" required></label><label>Categoria<select name="cat" required><option value="">Seleziona</option>${opts(categories,c.cat)}</select></label><label>Sottocategoria<input name="sub" value="${esc(c.sub)}" required></label><label>Stato<select name="state" required><option value="">Seleziona</option>${opts(['Fresco/refrigerato','Congelato','Surgelato','Secco/ambiente'],c.state)}</select></label><label>Ubicazione<select name="loc" required><option value="">Seleziona</option>${opts(places(),loc)}</select></label><label>Unità<select name="unit" required><option value="">Seleziona</option>${opts(units,normalizeUnit(u))}</select></label><label>Quantità<input name="qty" type="number" min="0.001" step="0.001" required value="${esc((q||'').replace(',','.'))}"></label><label>Prezzo per unità €<input name="price" type="number" min="0" step="any" required value="${esc((p||'').replace(',','.'))}"></label><label>Lotto<input name="lot" required></label><label>Scadenza<input name="expiry" type="date" required></label><label>Temperatura rilevata °C<input name="temp" type="number" step="any" required></label><label>Esito controllo<select name="result" required><option value="">Seleziona</option><option>Conforme</option><option>Non conforme</option></select></label><label>Azione correttiva<input name="action"></label></fieldset>`}).join('')}<button>Conferma carico merci</button></form>`:'Nessuna riga riconosciuta';let f=$('batchStock');if(f){f.onsubmit=batchStockSave;for(let row of f.querySelectorAll('[data-row]')){let get=n=>row.querySelector(`[name="${n}"]`);for(let n of ['cat','state'])get(n).addEventListener('change',()=>{get('loc').value=smartDestination(get('cat').value,get('state').value)})}};};
 function batchStockSave(e){e.preventDefault();let f=e.target,supplier=$('smartSupplier').value.trim(),number=$('smartNumber').value.trim(),date=$('smartDate').value,op=f.elements.operator.value.trim();if(!supplier||!number||!date||!op)return alert('Completare fornitore, numero, data e operatore');if(db.some(r=>r.module==='Registro fatture'&&r.data.Fornitore===supplier&&r.data['Numero documento']===number&&r.data['Data documento']===date))return alert('Documento già presente: verificare eventuali duplicati.');let id=()=> 'FG-'+crypto.randomUUID(),doc=id(),at=new Date().toISOString(),batch=[];for(let row of f.querySelectorAll('[data-row]')){let v=n=>row.querySelector(`[name="${n}"]`).value.trim();if(!validUnit(v('unit'))||!Number.isFinite(Number(v('qty')))||Number(v('qty'))<=0||!Number.isFinite(Number(v('price')))||Number(v('price'))<0)return alert('Verificare unità, quantità e prezzo');if(v('result')==='Non conforme'&&!v('action'))return alert('Indicare azione correttiva');if(v('cat')==='Pesce e molluschi'&&((['Congelato','Surgelato'].includes(v('state'))&&v('loc')!=='Congelatore pesce')||(v('state')==='Fresco/refrigerato'&&v('loc')!=='Cella pesce')))return alert('Verificare ubicazione pesce');batch.push({id:id(),module:'Ricevimento merci',at,data:{Operatore:op,Documento:doc,Prodotto:v('product'),Fornitore:supplier,Categoria:v('cat'),Sottocategoria:v('sub'),'Stato fisico':v('state'),Ubicazione:v('loc'),'Lotto fornitore':v('lot'),Scadenza:v('expiry'),'Quantità':v('qty'),'Unità':v('unit'),'Prezzo unitario €':v('price'),'Temperatura rilevata °C':v('temp'),Esito:v('result'),'Azione correttiva':v('action')}})}if(!confirm('Registrare '+batch.length+' lotti verificati?'))return;db.push({id:doc,module:'Registro fatture',at,data:{Operatore:op,Fornitore:supplier,'Numero documento':number,'Tipo documento':f.elements.kind.value,'Data documento':date,'Riferimento allegato':'SMART SCAN – originale da conservare'}},...batch);persist();home();}
@@ -184,7 +184,7 @@ async function enter(user){
     const {avviaAvvisiMagazzino}=await import('./modules/avvisi-magazzino.mjs');
     if(owner===user.id){
       chiudiAvvisi?.();
-      chiudiAvvisi=avviaAvvisiMagazzino(client,el('fgApp'));
+      chiudiAvvisi=avviaAvvisiMagazzino(client,el('fgApp'),()=>aggiornaArchivio(true));
     }
   }catch{report('Sezione avvisi non disponibile. Ricaricare la pagina.');}
 }
@@ -228,8 +228,11 @@ window.fgSaveProduction=async(recipeId,data)=>{
 };
 const retry=document.createElement('button');retry.textContent='Riprova salvataggio';retry.onclick=()=>window.fgSyncSave();status.after(retry);const refresh=document.createElement('button');
 refresh.textContent='Aggiorna archivio';
-refresh.onclick=async()=>{
-  if(busy||db.some(r=>!known.has(r.id)))return alert('Salvare prima le registrazioni in sospeso');
+async function aggiornaArchivio(automatico=false){
+  if(busy||db.some(r=>!known.has(r.id))){
+    if(!automatico)alert('Salvare prima le registrazioni in sospeso');
+    return false;
+  }
   busy=true;
   refresh.disabled=true;
   try{
@@ -239,16 +242,25 @@ refresh.onclick=async()=>{
     db=[...rows.map(r=>r.payload),...unsaved];
     known=remoteIds;
     revisions=new Map(rows.map(r=>[r.record_id,r.revision]));
-    render();
-    report('Archivio aggiornato');
+    if(!automatico||['Cella','Inventario FEFO','Magazzino','Cruscotto'].includes(active)){
+      const categorieAperte=[...el('archive').querySelectorAll('details')].map(d=>d.open);
+      render();
+      if(automatico&&active==='Cella'){
+        el('archive').querySelectorAll('details').forEach((d,i)=>{d.open=Boolean(categorieAperte[i])});
+      }
+    }
+    if(!automatico)report('Archivio aggiornato');
+    return true;
   }catch(e){
-    report('Aggiornamento non riuscito');
+    if(!automatico)report('Aggiornamento non riuscito');
+    return false;
   }finally{
     refresh.disabled=false;
     busy=false;
     if(pending)void window.fgSyncSave();
   }
-};
+}
+refresh.onclick=()=>aggiornaArchivio();
 retry.after(refresh);
 window.addEventListener('beforeunload',e=>{if(owner&&(busy||db.some(r=>!known.has(r.id)))){e.preventDefault();e.returnValue=''}});
 async function start(){if(!window.supabase){msg('Connessione non disponibile. Ricaricare la pagina.');return}try{client=make(localStorage.getItem('fg-haccp-remember')!=='no');const {data,error}=await client.auth.getUser();if(!error&&data.user)await enter(data.user);else show(false)}catch(e){msg('Impossibile verificare la sessione.')}}

@@ -1,4 +1,4 @@
-export function avviaAvvisiMagazzino(client, contenitore) {
+export function avviaAvvisiMagazzino(client, contenitore, aggiornaGiacenze) {
   const pannello = document.createElement('section');
   pannello.setAttribute('aria-label', 'Avvisi magazzino');
   const titolo = document.createElement('h2');
@@ -14,6 +14,7 @@ export function avviaAvvisiMagazzino(client, contenitore) {
   let timer;
   let inCorso = false;
   let chiuso = false;
+  let giacenzeDaAggiornare = false;
 
   async function aggiorna() {
     if (chiuso || inCorso || document.hidden) return;
@@ -31,6 +32,9 @@ export function avviaAvvisiMagazzino(client, contenitore) {
       }
       while (lista.children.length > 20) lista.lastElementChild.remove();
       stato.textContent = data.length ? lista.firstElementChild.textContent : (ultimo ? '' : 'Nessun avviso.');
+      if (data.length) giacenzeDaAggiornare = true;
+      if (giacenzeDaAggiornare && await aggiornaGiacenze()) giacenzeDaAggiornare = false;
+      if (chiuso) return;
       if (data.length === 100) {
         timer = setTimeout(aggiorna, 100);
         return;
