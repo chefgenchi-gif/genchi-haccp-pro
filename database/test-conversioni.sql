@@ -1,0 +1,7 @@
+begin; create function pg_temp.fg_convert(q numeric, src text, dst text) returns numeric language plpgsql immutable as $$ begin
+if q is null or q::text in ('NaN','Infinity','-Infinity') or q<=0 then raise exception 'Quantita non valida'; end if;
+if src not in ('kg','g','l','ml','pz') or dst not in ('kg','g','l','ml','pz') or src is null or dst is null then raise exception 'Unita non supportata'; end if;
+if src=dst then return q; end if;
+if (src,dst) in (('kg','g'),('l','ml')) then return q*1000; end if;
+if (src,dst) in (('g','kg'),('ml','l')) then return q/1000; end if;
+raise exception 'Unita incompatibili'; end $$; do $$ begin if pg_temp.fg_convert(500,'g','kg')<>0.5 or pg_temp.fg_convert(2,'kg','g')<>2000 or pg_temp.fg_convert(250,'ml','l')<>0.25 or pg_temp.fg_convert(3,'l','ml')<>3000 or pg_temp.fg_convert(5,'pz','pz')<>5 then raise exception 'FAIL conversion'; end if; begin perform pg_temp.fg_convert(1,'kg','l'); raise exception 'FAIL accepted' using errcode='XX000'; exception when raise_exception then null; end; begin perform pg_temp.fg_convert(-1,'kg','kg'); raise exception 'FAIL accepted' using errcode='XX000'; exception when raise_exception then null; end; end $$; select 'PASS 7 conversion checks' as result; rollback;
