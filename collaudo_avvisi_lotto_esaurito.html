@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Collaudo avvisi magazzino</title>
+<style>
+body{font:1.1rem system-ui;background:#f2f4f1;color:#172c24;margin:0}
+main{max-width:32rem;margin:auto;padding:1.4rem}
+section{background:white;border-radius:1rem;padding:1rem;margin-block:1rem}
+button{display:block;width:100%;margin:.5rem 0;padding:.8rem;border:0;border-radius:.5rem;background:#173f32;color:white;font:inherit;text-align:left}
+button:disabled{opacity:.5}
+</style>
+</head>
+<body>
+<main>
+<h1>Avvisi magazzino</h1>
+<p>SOLO COLLAUDO · Magazzino condiviso</p>
+<form id="accesso">
+<label for="codice">Codice prova</label>
+<input id="codice" required autocapitalize="none" autocomplete="off" style="box-sizing:border-box;width:100%;padding:.7rem;font:inherit">
+<button>Collegati al magazzino di prova</button>
+</form>
+<p id="connessione" role="status"></p>
+<section>
+<h2>Congelatore pesce</h2>
+<p>Filetti di merluzzo · Lotto MER-PROVA-001</p>
+<p>Giacenza: <strong id="saldo">—</strong></p>
+<button id="preleva" type="button" disabled>Simula prelievo da 4 kg</button>
+<button id="tutti" type="button" disabled>Preleva tutti e 5 kg</button>
+<button id="ultimo" type="button" disabled>Preleva l’ultimo kg</button>
+<button id="richiedi" type="button" disabled>Prova a prelevare 3 kg</button>
+
+</section>
+<section>
+<h2>Avviso agli operatori</h2>
+<p id="avviso" role="status">Nessun prelievo registrato.</p>
+<p id="esito" role="alert"></p>
+</section>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const api = 'https://dvfkwrfjmrqkzrwoyluk.supabase.co/rest/v1/rpc/haccp_collaudo_avvisi';
+const key = 'sb_publishable_kaRqT8TDRdcromoJCgzt7A_v_iJCOZQ';
+let codice, timer, inCorso = false;
+
+async function aggiorna(operazione = 'leggi') {
+  if (!codice || inCorso || (document.hidden && operazione === 'leggi')) return;
+  inCorso = true;
+  $('preleva').disabled = true;
+  $('tutti').disabled = true;
+  $('ultimo').disabled = true;
+  $('richiedi').disabled = true;
+  try {
+    const risposta = await fetch(api, {
+      method: 'POST',
+      headers: { apikey: key, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ codice_prova: codice, operazione }),
+    });
+    if (!risposta.ok) throw Error('Connessione al collaudo non disponibile.');
+    const esito = await risposta.json();
+    if (esito.scaduta) {
+      codice = undefined;
+      clearInterval(timer);
+      throw Error('Codice prova errato o scaduto.');
+    }
+    $('connessione').textContent = 'Collegato al magazzino di prova';
+    $('saldo').textContent = esito.saldo + ' kg';
+    $('avviso').textContent = esito.avviso
+      ? 'Congelatore pesce · Lotto MER-PROVA-001. Prelevati ' + esito.prelevato + ' kg. Residuo ' + esito.saldo + ' kg.' + (esito.saldo === 0 ? ' Lotto esaurito.' : '')
+      : 'Nessun prelievo registrato.';
+    if (esito.respinto) $('esito').textContent = 'Prelievo respinto. Disponibili ' + esito.saldo + ' kg.';
+    $('preleva').disabled = esito.saldo !== 5;
+    $('tutti').disabled = esito.saldo !== 5;
+    $('ultimo').disabled = esito.saldo !== 1;
+    $('richiedi').disabled = esito.saldo === 5;
+  } catch (errore) {
+    $('connessione').textContent = errore.message;
+  } finally {
+    inCorso = false;
+  }
+}
+$('accesso').onsubmit = evento => {
+  evento.preventDefault();
+  if (inCorso) return;
+  const ingresso = $('codice').value.trim();
+  if (!/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(ingresso)) {
+    $('connessione').textContent = 'Incolla il codice completo.';
+    return;
+  }
+  codice = ingresso;
+  $('esito').textContent = '';
+  clearInterval(timer);
+  void aggiorna();
+  timer = setInterval(aggiorna, 3000);
+};
+$('preleva').onclick = () => aggiorna('preleva4');
+$('tutti').onclick = () => aggiorna('preleva5');
+$('ultimo').onclick = () => aggiorna('preleva1');
+$('richiedi').onclick = () => aggiorna('prova3');
+document.addEventListener('visibilitychange', () => aggiorna());
+</script>
+</body>
+</html>
