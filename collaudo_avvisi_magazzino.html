@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Collaudo avvisi magazzino</title>
+<style>
+body{font:1.1rem system-ui;background:#f2f4f1;color:#172c24;margin:0}
+main{max-width:32rem;margin:auto;padding:1.4rem}
+section{background:white;border-radius:1rem;padding:1rem;margin-block:1rem}
+button{display:block;width:100%;margin:.5rem 0;padding:.8rem;border:0;border-radius:.5rem;background:#173f32;color:white;font:inherit;text-align:left}
+button:disabled{opacity:.5}
+</style>
+</head>
+<body>
+<main>
+<h1>Avvisi magazzino</h1>
+<p>SOLO COLLAUDO · Dati fittizi</p>
+<section>
+<h2>Congelatore pesce</h2>
+<p>Filetti di merluzzo · Lotto MER-PROVA-001</p>
+<p>Giacenza: <strong id="saldo">5 kg</strong></p>
+<button id="preleva" type="button">Simula prelievo da 4 kg</button>
+<button id="richiedi" type="button" disabled>Prova a prelevare 3 kg</button>
+<button id="ripeti" type="button">Ricomincia</button>
+</section>
+<section>
+<h2>Avviso agli operatori</h2>
+<p id="avviso" role="status">Nessun prelievo registrato.</p>
+<p id="esito" role="alert"></p>
+</section>
+</main>
+<script>
+const saldo = document.getElementById('saldo');
+const avviso = document.getElementById('avviso');
+const esito = document.getElementById('esito');
+const preleva = document.getElementById('preleva');
+const richiedi = document.getElementById('richiedi');
+preleva.onclick = () => {
+  if (preleva.disabled) return;
+  saldo.textContent = '1 kg';
+  avviso.textContent = 'Congelatore pesce · Lotto MER-PROVA-001. Prelevati 4 kg. Residuo 1 kg.';
+  preleva.disabled = true;
+  richiedi.disabled = false;
+};
+richiedi.onclick = () => {
+  if (richiedi.disabled) return;
+  esito.textContent = 'Prelievo di 3 kg respinto. Disponibile 1 kg.';
+};
+document.getElementById('ripeti').onclick = () => {
+  saldo.textContent = '5 kg';
+  avviso.textContent = 'Nessun prelievo registrato.';
+  esito.textContent = '';
+  preleva.disabled = false;
+  richiedi.disabled = true;
+};
+</script>
+</body>
+</html>
