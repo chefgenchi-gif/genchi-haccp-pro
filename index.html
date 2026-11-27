@@ -104,4 +104,17 @@ const priorProdForm=productionForm;productionForm=function(){return priorProdFor
 const priorSaveProd=saveProd;saveProd=function(e){e.preventDefault();let f=new FormData(e.target),r=db.find(x=>x.id===f.get('recipe'));if(!r||!Number.isFinite(Number(r.data['Durata validata ore']))||Number(r.data['Durata validata ore'])<=0)return alert('Procedura di conservazione da validare');if(!finishedQty({data:{'Quantità e unità':f.get('Quantità e unità')}})||finishedQty({data:{'Quantità e unità':f.get('Quantità e unità')}}).q<=0)return alert('Indicare quantità e unità, es. 5 kg');for(let [k,v] of f){if(k.startsWith('lot_')&&Number(v)>0){let lot=db.find(x=>x.id===k.slice(4));if(!lot||status(lot)==='BLOCCATO')return alert('Lotto bloccato')}}priorSaveProd(e)};
 
 render();
+
+/* FG COLLAUDO: production registration disabled; calculations remain read-only. */
+const fgTestBlocked = m => ['produzione','movimenti prodotti finiti'].includes(String(m||'').trim().toLowerCase());
+const fgTestNotice = () => alert('COLLAUDO: registrazione reale disabilitata. Utilizzare soltanto simulazioni.');
+saveProd = function(e){e?.preventDefault();fgTestNotice();};
+const fgTestSave = save;
+save = function(e){if(fgTestBlocked(active)){e?.preventDefault();fgTestNotice();return;}return fgTestSave(e);};
+finishedWaste = function(){fgTestNotice();};
+const fgTestRestore = restore;
+restore = async function(i){try{const records=JSON.parse(await i.files[0].text());if(!Array.isArray(records)||records.some(r=>fgTestBlocked(r.module))){fgTestNotice();i.value='';return;}}catch(e){i.value='';alert('Backup non valido');return;}return fgTestRestore(i);};
+const fgTestRender = render;
+render = function(){fgTestRender();if(active==='Produzione'){const f=$('prod');if(f){f.onsubmit=saveProd;f.querySelectorAll('button:not([type="button"]),input[type="submit"]').forEach(b=>{b.disabled=true;b.textContent='Registrazione reale bloccata';});f.insertAdjacentHTML('afterbegin','<p class="warn" style="grid-column:1/-1">MODALITÀ COLLAUDO — simulazione senza registrazione e senza scarico reale.</p>');}}};
+render();
 </script></html>
