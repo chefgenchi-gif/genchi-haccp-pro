@@ -27,6 +27,7 @@ export function avviaAvvisiMagazzino(client, contenitore, aggiornaGiacenze) {
       for (const avviso of data) {
         const riga = document.createElement('li');
         riga.textContent = `${avviso.ubicazione} · ${avviso.prodotto} · Lotto ${avviso.lotto_id}: prelevati ${avviso.prelevato} ${avviso.unita}. Residuo ${avviso.residuo} ${avviso.unita}.`;
+        if (avviso.residuo === 0) riga.textContent += ' Lotto esaurito.';
         lista.prepend(riga);
         ultimo = avviso.sequenza;
       }
