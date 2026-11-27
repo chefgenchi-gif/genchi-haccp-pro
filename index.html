@@ -171,8 +171,30 @@ const status=document.createElement('p');status.setAttribute('role','status');el
 async function readArchive(){let rows=[],offset=0;for(;;){const {data,error}=await client.from('haccp_archive').select('record_id,payload').eq('owner_id',owner).order('record_id').range(offset,offset+499);if(error)throw error;rows.push(...data);if(data.length<500)break;offset+=500}return rows}
 async function enter(user){owner=user.id;db=[];known=new Set();const rows=await readArchive();for(const r of rows){db.push(r.payload);known.add(r.record_id)}render();report('Archivio online caricato');show(true)}
 window.fgSyncSave=async()=>{if(!owner)return;pending=true;if(busy)return;busy=true;try{while(pending){pending=false;const batch=db.filter(r=>!known.has(r.id));if(batch.length){report('Salvataggio online in corso…');const {error}=await client.from('haccp_archive').insert(batch.map(r=>({owner_id:owner,record_id:r.id,module:r.module,payload:r})));if(error)throw error;batch.forEach(r=>known.add(r.id))}report('Registrazioni salvate online')}}catch(e){report('Salvataggio non riuscito: esportare il backup e premere Riprova.');}finally{busy=false}};
-window.fgUpdateRecipe=async(old,next)=>{if(!owner||busy||!known.has(old.id))throw Error('Archivio non pronto');busy=true;try{const {data:row,error:readError}=await client.from('haccp_archive').select('payload,revision').eq('owner_id',owner).eq('record_id',old.id).single();if(readError||!row)throw Error('Ricetta non leggibile');const canonical=x=>JSON.stringify(Object.keys(x).sort().map(k=>[k,x[k]]));if(canonical(row.payload.data)!==canonical(old.data))throw Error('Ricetta modificata altrove: aggiornare archivio');next.history=[...(row.payload.history||[]),{at:new Date().toISOString(),data:row.payload.data}];const {data,error}=await client.from('haccp_archive').update({payload:next,revision:row.revision+1,updated_at:new Date().toISOString()}).eq('owner_id',owner).eq('record_id',old.id).eq('revision',row.revision).select('record_id');if(error||data?.length!==1)throw Error('Salvataggio non riuscito: verificare permessi o aggiornare archivio');db=db.map(r=>r.id===old.id?next:r);report('Ricetta aggiornata online')}finally{busy=false}};
-const retry=document.createElement('button');retry.textContent='Riprova salvataggio';retry.onclick=()=>window.fgSyncSave();status.after(retry);const refresh=document.createElement('button');refresh.textContent='Aggiorna archivio';refresh.onclick=async()=>{if(busy||db.some(r=>!known.has(r.id)))return alert('Salvare prima le registrazioni in sospeso');try{const rows=await readArchive();db=rows.map(r=>r.payload);known=new Set(rows.map(r=>r.record_id));render();report('Archivio aggiornato')}catch(e){report('Aggiornamento non riuscito')}};retry.after(refresh);
+window.fgUpdateRecipe=async(old,next)=>{if(!owner||busy||!known.has(old.id))throw Error('Archivio non pronto');busy=true;try{const {data:row,error:readError}=await client.from('haccp_archive').select('payload,revision').eq('owner_id',owner).eq('record_id',old.id).single();if(readError||!row)throw Error('Ricetta non leggibile');const canonical=x=>JSON.stringify(Object.keys(x).sort().map(k=>[k,x[k]]));if(canonical(row.payload.data)!==canonical(old.data))throw Error('Ricetta modificata altrove: aggiornare archivio');next.history=[...(row.payload.history||[]),{at:new Date().toISOString(),data:row.payload.data}];const {data,error}=await client.from('haccp_archive').update({payload:next,revision:row.revision+1,updated_at:new Date().toISOString()}).eq('owner_id',owner).eq('record_id',old.id).eq('revision',row.revision).select('record_id');if(error||data?.length!==1)throw Error('Salvataggio non riuscito: verificare permessi o aggiornare archivio');db=db.map(r=>r.id===old.id?next:r);report('Ricetta aggiornata online')}finally{busy=false;if(pending)void window.fgSyncSave()}};
+const retry=document.createElement('button');retry.textContent='Riprova salvataggio';retry.onclick=()=>window.fgSyncSave();status.after(retry);const refresh=document.createElement('button');
+refresh.textContent='Aggiorna archivio';
+refresh.onclick=async()=>{
+  if(busy||db.some(r=>!known.has(r.id)))return alert('Salvare prima le registrazioni in sospeso');
+  busy=true;
+  refresh.disabled=true;
+  try{
+    const rows=await readArchive();
+    const remoteIds=new Set(rows.map(r=>r.record_id));
+    const unsaved=db.filter(r=>!known.has(r.id)&&!remoteIds.has(r.id));
+    db=[...rows.map(r=>r.payload),...unsaved];
+    known=remoteIds;
+    render();
+    report('Archivio aggiornato');
+  }catch(e){
+    report('Aggiornamento non riuscito');
+  }finally{
+    refresh.disabled=false;
+    busy=false;
+    if(pending)void window.fgSyncSave();
+  }
+};
+retry.after(refresh);
 window.addEventListener('beforeunload',e=>{if(owner&&(busy||db.some(r=>!known.has(r.id)))){e.preventDefault();e.returnValue=''}});
 async function start(){if(!window.supabase){msg('Connessione non disponibile. Ricaricare la pagina.');return}try{client=make(localStorage.getItem('fg-haccp-remember')!=='no');const {data,error}=await client.auth.getUser();if(!error&&data.user)await enter(data.user);else show(false)}catch(e){msg('Impossibile verificare la sessione.')}}
 el('fgLoginForm').addEventListener('submit',async e=>{e.preventDefault();const b=e.target.querySelector('button');b.disabled=true;msg('Verifica accesso…');try{if(!window.supabase)throw Error();const remember=el('fgRemember').checked;localStorage.setItem('fg-haccp-remember',remember?'yes':'no');(remember?sessionStorage:localStorage).removeItem('fg-haccp-auth');client=make(remember);const {error}=await client.auth.signInWithPassword({email:el('fgEmail').value.trim(),password:el('fgPassword').value});if(error){msg('Accesso non riuscito. Verifica le credenziali.');return}el('fgPassword').value='';msg('');const {data,error:verifyError}=await client.auth.getUser();if(verifyError||!data.user)throw Error();await enter(data.user)}catch(e){msg('Connessione non disponibile. Riprova.')}finally{b.disabled=false}});
