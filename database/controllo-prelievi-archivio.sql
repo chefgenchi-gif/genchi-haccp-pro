@@ -17,6 +17,9 @@ declare
   carico numeric;
   consumato numeric;
   richiesto numeric;
+  unita text;
+  ultimo_operatore text;
+  ultimo_prelievo numeric;
   scadenza text;
   data_ora timestamp := pg_catalog.timezone('Europe/Rome', pg_catalog.clock_timestamp());
 begin
@@ -74,9 +77,30 @@ begin
 
     if carico is null or carico::text in ('NaN','Infinity','-Infinity')
        or consumato::text in ('NaN','Infinity','-Infinity') or consumato < 0
-       or richiesto > carico - consumato then
-      raise exception 'Disponibilità insufficiente per il lotto %', prelievo.key
+       then
+      raise exception 'Saldo non valido per il lotto %', prelievo.key
         using errcode = '22023';
+    end if;
+    if richiesto > carico - consumato then
+      unita := coalesce(nullif(lotto->>'Unità',''), 'kg');
+      select nullif(btrim(payload#>>'{data,Operatore}'),''),
+             (payload->'data'->'prelievi'->>prelievo.key)::numeric
+      into ultimo_operatore, ultimo_prelievo
+      from public.haccp_archive
+      where owner_id = new.owner_id and module = 'Produzione'
+        and (payload->'data'->'prelievi') ? prelievo.key
+      order by updated_at desc, record_id desc
+      limit 1;
+
+      if ultimo_operatore is not null then
+        raise exception 'Disponibilità insufficiente per il lotto %: in % resta % %. Ultimo prelievo: % ha prelevato % %.',
+          prelievo.key, coalesce(nullif(lotto->>'Ubicazione',''),'magazzino'),
+          trim_scale(carico-consumato), unita, ultimo_operatore, trim_scale(ultimo_prelievo), unita
+          using errcode = '22023';
+      end if;
+      raise exception 'Disponibilità insufficiente per il lotto %: in % resta % %.',
+        prelievo.key, coalesce(nullif(lotto->>'Ubicazione',''),'magazzino'),
+        trim_scale(carico-consumato), unita using errcode = '22023';
     end if;
   end loop;
 
