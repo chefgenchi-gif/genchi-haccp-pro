@@ -197,6 +197,12 @@ window.fgSaveOrder=async ordine=>{
   if(!known.has(ordine.id)) throw Error('Ordine in sospeso. Riprova il salvataggio con gli stessi dati.');
   if(active==='Ordini fornitori') render();
 };
+const archivioFoto=()=>client.storage.from('haccp-foto-ricette');
+const percorsoFoto=id=>owner+'/'+id+'/foto';
+window.fgFotoRicetta={
+  leggi:id=>owner?archivioFoto().createSignedUrl(percorsoFoto(id),900):{error:true},
+  salva:(id,file)=>owner?archivioFoto().upload(percorsoFoto(id),file,{upsert:true,contentType:file.type,cacheControl:'0'}):{error:true}
+};
 window.fgUpdateRecipe=async(old,next)=>{if(!owner||busy||!known.has(old.id))throw Error('Archivio non pronto');busy=true;try{const {data:row,error:readError}=await client.from('haccp_archive').select('payload,revision').eq('owner_id',owner).eq('record_id',old.id).single();if(readError||!row)throw Error('Ricetta non leggibile');const canonical=x=>JSON.stringify(Object.keys(x).sort().map(k=>[k,x[k]]));if(canonical(row.payload.data)!==canonical(old.data))throw Error('Ricetta modificata altrove: aggiornare archivio');next.history=[...(row.payload.history||[]),{at:new Date().toISOString(),data:row.payload.data}];const {data,error}=await client.from('haccp_archive').update({payload:next,revision:row.revision+1,updated_at:new Date().toISOString()}).eq('owner_id',owner).eq('record_id',old.id).eq('revision',row.revision).select('record_id');if(error||data?.length!==1)throw Error('Salvataggio non riuscito: verificare permessi o aggiornare archivio');db=db.map(r=>r.id===old.id?next:r);revisions.set(old.id,row.revision+1);report('Ricetta aggiornata online')}finally{busy=false;if(pending)void window.fgSyncSave()}};
 window.fgSaveProduction=async(recipeId,data)=>{
   if(!owner||busy||db.some(row=>!known.has(row.id))) {
@@ -289,4 +295,16 @@ render=function(){
   mostraOrdini({panel:$('panel'),archive:$('archive'),records:db,salva:window.fgSaveOrder});
 };
 if(active==='Home')render();
+</script><script type="module">
+import { aggiungiFotoRicetta } from './modules/foto-ricette.mjs';
+const renderPrimaDelleFoto=render;
+render=function(){
+  renderPrimaDelleFoto();
+  if(!['Reparto','Categoria','Ricette e procedure'].includes(active))return;
+  const contenitore=$('archive');
+  if(!contenitore||!window.fgFotoRicetta)return;
+  const ricette=db.filter(r=>r.module==='Ricette e procedure'&&(!dept||r.data.Reparto===dept)&&(!sub||r.data['Categoria produzione']===sub));
+  for(const ricetta of ricette)aggiungiFotoRicetta(contenitore,ricetta,window.fgFotoRicetta);
+};
+if(['Reparto','Categoria','Ricette e procedure'].includes(active))render();
 </script></html>
