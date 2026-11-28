@@ -282,7 +282,15 @@ function aggiungiSceltaIngredienti(form, reparto, magazzino) {
   const righe = form.elements['Ingredienti e grammature'];
   const box = document.createElement('div');
   box.style.gridColumn = '1/-1';
-  box.innerHTML = `<label>Ingrediente<select id="fgIng"></select></label>
+  box.innerHTML = `<section id="fgSpeciePesce" class="record" aria-label="Specie di pesce" hidden>
+  <strong>Specie di pesce</strong>
+  <div id="fgPesciRapidi" style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0"></div>
+  <details id="fgTuttiPesci">
+    <summary>Tutte le 27 specie</summary>
+    <div id="fgElencoPesci" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"></div>
+  </details>
+</section>
+    <label>Ingrediente<select id="fgIng"></select></label>
     <p class="muted" id="fgIngInfo" aria-live="polite" hidden></p>
     <label>Quantità<input id="fgQty" type="number" min="0.001" step="any"></label>
     <label>Unità<select id="fgUnit">${units.map(u => `<option>${u}</option>`).join('')}</select></label>
@@ -292,6 +300,29 @@ function aggiungiSceltaIngredienti(form, reparto, magazzino) {
   const quantita = box.querySelector('#fgQty');
   const unita = box.querySelector('#fgUnit');
   const info = box.querySelector('#fgIngInfo');
+
+  const specieVisibili = box.querySelector('#fgSpeciePesce');
+  const tutteLeSpecie = box.querySelector('#fgTuttiPesci');
+  const elencoCompleto = box.querySelector('#fgElencoPesci');
+  const scelteRapide = box.querySelector('#fgPesciRapidi');
+  const nomiRapidi = ['Branzino', 'Ricciola', 'Triglia', 'Sarago', 'Ombrina'];
+
+  function pulsanteSpecie([nome, descrizione]) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'secondary';
+    button.style.minHeight = '44px';
+    button.textContent = descrizione;
+    button.onclick = () => {
+      const nomeRegistrato = magazzino.find(voce => voce.toLowerCase() === nome.toLowerCase());
+      scelta.value = nomeRegistrato ?? nome;
+      scelta.onchange();
+      tutteLeSpecie.open = false;
+      quantita.focus();
+    };
+    return button;
+  }
+
 
   function aggiornaOpzioni() {
     const valore = scelta.value;
@@ -309,6 +340,11 @@ function aggiungiSceltaIngredienti(form, reparto, magazzino) {
     }
     scelta.value = nomiIngredienti(reparto.value, magazzino).has(valore) ? valore : '';
     info.hidden = !scelta.value || magazzino.includes(scelta.value);
+    specieVisibili.hidden = reparto.value !== 'Lavorazione pesce';
+    if (!specieVisibili.hidden && !scelteRapide.childElementCount) {
+      scelteRapide.append(...nomiRapidi.map(nome => pulsanteSpecie(speciePesce.find(voce => voce[0] === nome))));
+      elencoCompleto.append(...speciePesce.map(pulsanteSpecie));
+    }
   }
 
   info.textContent = 'Puoi usare questa specie nella ricetta. Per produrre, carica prima il lotto in magazzino con lo stesso nome.';
