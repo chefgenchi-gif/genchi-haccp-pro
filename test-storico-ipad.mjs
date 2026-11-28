@@ -11,11 +11,17 @@ const root = resolve(process.argv[2] || '.');
 const archive = [{record_id:'FG-LOT-COLLAUDO',revision:1,payload:{
   id:'FG-LOT-COLLAUDO',module:'Produzione',at:new Date().toISOString(),data:{Preparazione:'Lotto sintetico'},
 }}];
+let rifiutaProssimoSalvataggio = true;
 const server = createServer(async (req,res)=>{
   try {
     const url=new URL(req.url,'http://localhost');
     if(url.pathname==='/test-archive'){
       if(req.method==='POST'){
+        if(rifiutaProssimoSalvataggio){
+          rifiutaProssimoSalvataggio=false;
+          res.writeHead(503).end();
+          return;
+        }
         const chunks=[];
         for await(const chunk of req)chunks.push(chunk);
         archive.push(...JSON.parse(Buffer.concat(chunks)));
@@ -68,6 +74,11 @@ try{
       }
       form.requestSubmit();
     },marker);
+    if(index===0){
+      await page.getByText(/Salvataggio non riuscito/).waitFor();
+      assert.equal(archive.some(row=>row.payload.data.Operatore===marker),false);
+      await page.getByRole('button',{name:'Riprova salvataggio'}).click();
+    }
     await page.getByText('Registrazioni salvate online',{exact:true}).waitFor();
     assert.equal(archive.filter(row=>row.payload.data.Operatore===marker && row.payload.module===module).length,1);
   }
