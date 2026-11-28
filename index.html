@@ -181,6 +181,22 @@ const status=document.createElement('p');status.setAttribute('role','status');el
 async function readArchive(){let rows=[],offset=0;for(;;){const {data,error}=await client.from('haccp_archive').select('record_id,payload').eq('owner_id',owner).order('record_id').range(offset,offset+499);if(error)throw error;rows.push(...data);if(data.length<500)break;offset+=500}return rows}
 async function enter(user){owner=user.id;db=[];known=new Set();const rows=await readArchive();for(const r of rows){db.push(r.payload);known.add(r.record_id)}render();report('Archivio online caricato');show(true)}
 window.fgSyncSave=async()=>{if(!owner)return;pending=true;if(busy)return;busy=true;try{while(pending){pending=false;const batch=db.filter(r=>!known.has(r.id));if(batch.length){report('Salvataggio online in corso…');const {error}=await client.from('haccp_archive').insert(batch.map(r=>({owner_id:owner,record_id:r.id,module:r.module,payload:r})));if(error)throw error;batch.forEach(r=>known.add(r.id))}report('Registrazioni salvate online')}}catch(e){report('Salvataggio non riuscito: esportare il backup e premere Riprova.');}finally{busy=false}};
+let urlManuale;
+window.fgLeggiManuale = async () => {
+  if (!owner) throw Error('Accedi per aprire il manuale.');
+  if (urlManuale) return urlManuale;
+  const sessione = client;
+  const utente = owner;
+  const { data, error } = await sessione.from('haccp_manuals')
+    .select('pdf_base64').eq('slug', 'illustrato').single();
+  if (error || !data?.pdf_base64 || client !== sessione || owner !== utente) {
+    throw Error('Manuale non disponibile.');
+  }
+  const bytes = Uint8Array.from(atob(data.pdf_base64), char => char.charCodeAt(0));
+  if (urlManuale) return urlManuale;
+  urlManuale = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+  return urlManuale;
+};
 const archivioFoto=()=>client.storage.from('haccp-foto-ricette');
 const percorsoFoto=id=>owner+'/'+id+'/foto';
 window.fgFotoRicetta={
@@ -192,7 +208,12 @@ const retry=document.createElement('button');retry.textContent='Riprova salvatag
 window.addEventListener('beforeunload',e=>{if(owner&&(busy||db.some(r=>!known.has(r.id)))){e.preventDefault();e.returnValue=''}});
 async function start(){if(!window.supabase){msg('Connessione non disponibile. Ricaricare la pagina.');return}try{client=make(localStorage.getItem('fg-haccp-remember')!=='no');const {data,error}=await client.auth.getUser();if(!error&&data.user)await enter(data.user);else show(false)}catch(e){msg('Impossibile verificare la sessione.')}}
 el('fgLoginForm').addEventListener('submit',async e=>{e.preventDefault();const b=e.target.querySelector('button');b.disabled=true;msg('Verifica accesso…');try{if(!window.supabase)throw Error();const remember=el('fgRemember').checked;localStorage.setItem('fg-haccp-remember',remember?'yes':'no');(remember?sessionStorage:localStorage).removeItem('fg-haccp-auth');client=make(remember);const {error}=await client.auth.signInWithPassword({email:el('fgEmail').value.trim(),password:el('fgPassword').value});if(error){msg('Accesso non riuscito. Verifica le credenziali.');return}el('fgPassword').value='';msg('');const {data,error:verifyError}=await client.auth.getUser();if(verifyError||!data.user)throw Error();await enter(data.user)}catch(e){msg('Connessione non disponibile. Riprova.')}finally{b.disabled=false}});
-el('fgLogout').onclick=async()=>{if(busy||db.some(r=>!known.has(r.id)))return alert('Salvare o esportare le registrazioni prima di uscire');show(false);owner=null;db=[];known.clear();render();try{await client.auth.signOut({scope:'local'})}finally{localStorage.removeItem('fg-haccp-auth');sessionStorage.removeItem('fg-haccp-auth');msg('Sessione terminata.')}};start();})();
+el('fgLogout').onclick=async()=>{if(busy||db.some(r=>!known.has(r.id)))return alert('Salvare o esportare le registrazioni prima di uscire');show(false);owner=null;
+if (urlManuale) {
+  URL.revokeObjectURL(urlManuale);
+  urlManuale = undefined;
+}
+db=[];known.clear();render();try{await client.auth.signOut({scope:'local'})}finally{localStorage.removeItem('fg-haccp-auth');sessionStorage.removeItem('fg-haccp-auth');msg('Sessione terminata.')}};start();})();
 </script><script type="module">
 import { aggiungiFotoRicetta } from './modules/foto-ricette.mjs';
 const renderPrimaDelleFoto=render;
