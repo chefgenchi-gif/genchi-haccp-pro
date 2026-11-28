@@ -85,6 +85,72 @@ const cataloghi = {
   }],
 };
 
+// Per queste voci lo stato fisico si sceglie dalla confezione al carico.
+const prodottiDaOrdini = {
+  'Cella carni': {
+    Carni: ['Carne macinata', 'Filetto di maialino', 'Salsiccia luganega'],
+  },
+  'Cella pesce': {
+    'Pesce e molluschi': [
+      'Branzino eviscerato calibro 250/400', 'Dentice eviscerato',
+      'Filetti di branzino calibro 400/600', 'Filetti di cernia', 'Filetti di ombrina',
+      'Filetti di orata calibro 400/600', 'Filetti di ricciola', 'Filetti di salmone',
+      'Filone di pesce spada', 'Pesce spada affumicato', 'Salmone affumicato',
+      'Tonno decongelato',
+    ],
+  },
+  'Cella formaggi e latticini': {
+    'Formaggi e latticini': [
+      'Caprino', 'Feta greca', 'Formaggi misti', 'Grana in ottavi', 'Latte', 'Panna 38%',
+    ],
+  },
+  'Cella salumi': {
+    Salumi: ['Black Angus affumicato', 'Capocollo', 'Coppa di Parma',
+      'Fesa di tacchino arrosto', 'Finocchiata di Montalcino', 'Salame contadino', 'Salame Felino', 'Spianata'],
+  },
+  'Cella ortofrutta': {
+    Ortofrutta: ['Asparagi', 'Cavolo bianco', 'Cipolla a fette', 'Fave', 'Funghi champignon interi'],
+  },
+  'Cella prodotti cotti': {
+    Preparazioni: ['Spalla CBT'],
+  },
+  'Cella semilavorati': {
+    Preparazioni: ['Cous cous di verdure', 'Gnocchi di patate', 'Paglia e fieno',
+      'Panciotti alla capasanta', 'Ravioli alla burrata'],
+  },
+  'Cella pasticceria': {
+    Pasticceria: ['Lievito di birra', 'Tartellette'],
+    'Uova e ovoprodotti': ['Uova'],
+  },
+  'Congelatore pesce': {
+    'Pesce e molluschi': [
+      'Anelli di calamari', 'Cozze a mezzo guscio grandi', 'Gamberi di fiume surgelati', 'Gamberi sgusciati',
+      'Gamberi sgusciati calibro 31/40', 'Polpa di astice', 'Polpa di granceola',
+      'Polpa di scampi', 'Seppie calibro 50/100',
+    ],
+  },
+  'Congelatore preparazioni': {
+    Preparazioni: ['Arancini', 'Cotolette artigianali', 'Crocchette', 'Frittelle di alghe',
+      'Patate a fette con buccia', 'Patate duchessa', 'Patate stick'],
+    Ortofrutta: ['Funghi misto bosco'],
+    Pasticceria: ['Cornetti vuoti'],
+  },
+  'Magazzino alimenti secchi': {
+    'Alimenti secchi': [
+      'Arachidi', 'Crema di aceto al ribes', 'Crema di aceto allo zafferano', 'Crema di aceto alla menta',
+      'Cuori di palma', 'Farro precotto', 'Fusilli senza glutine', 'Glassa al balsamico',
+      'Ketchup in monoporzione', 'Ketchup in secchio', 'Maionese in monoporzione',
+      'Maionese in secchio', 'Mais al naturale', 'Mandorle', 'Mezzi paccheri',
+      'Mezzi paccheri rigati', 'Noci', 'Olive nere denocciolate', 'Orecchiette senza glutine',
+      'Pane senza glutine', 'Penne', 'Penne senza glutine', 'Riso MARR',
+      'Tonno sott’olio', 'Tubetti senza glutine', 'Zucchero semolato',
+    ],
+  },
+  'Magazzino bevande': {
+    Bevande: ['Vino Porto'],
+  },
+};
+
 export function catalogoUbicazione(ubicazione, storico, specie) {
   const [stato, gruppi] = Object.hasOwn(cataloghi, ubicazione) ? cataloghi[ubicazione] : [];
   const catalogo = new Map();
@@ -92,6 +158,13 @@ export function catalogoUbicazione(ubicazione, storico, specie) {
     const elenco = ubicazione === 'Cella pesce' && categoria === 'Pesce e molluschi'
       ? [...specie, ...prodotti] : prodotti;
     for (const nome of elenco) catalogo.set(nome.toLocaleLowerCase('it'), { nome, categoria, stato });
+  }
+  const importati = Object.hasOwn(prodottiDaOrdini, ubicazione) ? prodottiDaOrdini[ubicazione] : {};
+  for (const [categoria, prodotti] of Object.entries(importati)) {
+    for (const nome of prodotti) {
+      const chiave = nome.toLocaleLowerCase('it');
+      if (!catalogo.has(chiave)) catalogo.set(chiave, { nome, categoria, stato: '' });
+    }
   }
   for (const prodotto of storico) {
     if (prodotto.ubicazione === ubicazione && typeof prodotto.nome === 'string' && prodotto.nome.trim()) {
