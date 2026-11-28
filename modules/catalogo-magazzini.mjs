@@ -143,7 +143,7 @@ const prodottiDaOrdini = {
       'Maionese in secchio', 'Mais al naturale', 'Mandorle', 'Mezzi paccheri',
       'Mezzi paccheri rigati', 'Noci', 'Olive nere denocciolate', 'Orecchiette senza glutine',
       'Pane senza glutine', 'Penne', 'Penne senza glutine', 'Riso MARR',
-      'Tonno sott’olio', 'Tubetti senza glutine', 'Zucchero semolato',
+      'Tonno sott’olio', 'Tubetti senza glutine', 'Zucchero semolato', 'Purè di patate (Phifanny)',
     ],
   },
   'Magazzino bevande': {
