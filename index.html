@@ -94,7 +94,42 @@ function openSub(i){sub=departments[dept][i];active='Categoria';render()}
 function go(m){active=m;render()}
 function scopedRows(){return db.filter(r=>['Produzione','Ricette e procedure'].includes(r.module)&&r.data.Reparto===dept&&(!sub||r.data['Categoria produzione']===sub))}
 function rowsHtml(rows){return rows.map(r=>`<div class="record"><b>${esc(r.data.Preparazione||r.data.Prodotto||r.module)}</b><br>${esc(r.id)} · ${esc(r.data['Lotto fornitore']||'')}<br>${esc(r.data['Scadenza validata']||r.data.Scadenza||'')}${r.module==='Ricevimento merci'?'<br>Residuo: '+stock(r).toFixed(3)+' kg':''}</div>`).join('')||'<p>Nessuna registrazione.</p>'}
-render=function(){if(['Home','Cella','Reparto','Categoria'].includes(active)){$('archive').innerHTML='';$('panel').innerHTML='';if(active==='Home'){$('panel').innerHTML='<h2>Magazzini e attrezzature</h2><div class="tiles">'+places().map((x,i)=>tile(x,/Congelatore/.test(x)?'❄':/pesce/i.test(x)?'🐟':/carni/i.test(x)?'🥩':'▣',`openPlace(${i})`)).join('')+['Abbattimento positivo','Abbattimento negativo'].map(x=>tile(x,'❄',`go(\'${x}\')`)).join('')+'</div><h2>Reparti di produzione</h2><div class="tiles">'+Object.keys(departments).map((x,i)=>tile(x,(['🎂','🍞','🍳','🥗','🥩','🐟','🍽','🍴','▣','🥐','🍳','🍽','🍰','🍸','📖','🍴','🔔','🛎','☕','🍎','🔥','✓'][i]||'▣'),`openDept(${i})`)).join('')+'</div><h2>Registri e servizi</h2><div class="tiles">'+['Cruscotto','Inventario FEFO','Impostazioni',...Object.keys(schemas)].map(x=>tile(x,'▤',`go(\'${x}\')`)).join('')+'</div>'}else if(active==='Cella'){$('panel').innerHTML='<h2>'+esc(place)+'</h2><button onclick="go(\'Ricevimento merci\')">Carico merce</button> <button onclick="go(\'Temperature\')">Registra temperatura</button> <button onclick="go(\'Movimenti magazzino\')">Movimenti</button>';$('archive').innerHTML='<h2>Giacenze della cartella</h2>'+rowsHtml(inventory().filter(r=>locationOf(r)===place))}else{$('panel').innerHTML='<h2>'+esc(dept)+(sub?' / '+esc(sub):'')+'</h2>'+(active==='Reparto'?'<div class="tiles">'+departments[dept].map((x,i)=>tile(x,'▣',`openSub(${i})`)).join('')+'</div>':'<button onclick="go(\'Ricette e procedure\')">Nuova ricetta</button> <button onclick="go(\'Produzione\')">Nuova produzione</button>');$('archive').innerHTML='<h2>Archivio del reparto</h2>'+rowsHtml(scopedRows())}}else{originalRender();let f=$('entry');if(f&&active==='Ricette e procedure'&&dept){f.elements.Reparto.value=dept;f.elements['Categoria produzione'].value=sub}if(f&&active==='Temperature'&&place)f.elements.Attrezzatura.value=place;if(f&&active==='Ricevimento merci'&&place)f.elements.Ubicazione.value=place;if(active==='Produzione'&&dept){let p=$('prod');p.elements.Reparto.value=dept;for(let o of [...p.elements.recipe.options]){let r=db.find(x=>x.id===o.value);if(r&&(r.data.Reparto!==dept||(sub&&r.data['Categoria produzione']!==sub)))o.remove()}}} $('nav').innerHTML='<button onclick="home()">⌂ Cartelle principali</button> <button onclick="go(\'Cruscotto\')">Cruscotto</button>'+(dept?` <button onclick="active='Reparto';sub='';render()">Reparto</button>`:'')+(place?` <button onclick="active='Cella';render()">Torna alla cella</button>`:'');setLogo()};
+render=function(){if(['Home','Cella','Reparto','Categoria'].includes(active)){$('archive').innerHTML='';$('panel').innerHTML='';if(active==='Home'){$('panel').innerHTML='<h2>Magazzini e attrezzature</h2><div class="tiles">'+places().map((x,i)=>tile(x,/Congelatore/.test(x)?'❄':/pesce/i.test(x)?'🐟':/carni/i.test(x)?'🥩':'▣',`openPlace(${i})`)).join('')+['Abbattimento positivo','Abbattimento negativo'].map(x=>tile(x,'❄',`go(\'${x}\')`)).join('')+'</div><h2>Reparti di produzione</h2><div class="tiles">'+Object.keys(departments).map((x,i)=>tile(x,(['🎂','🍞','🍳','🥗','🥩','🐟','🍽','🍴','▣','🥐','🍳','🍽','🍰','🍸','📖','🍴','🔔','🛎','☕','🍎','🔥','✓'][i]||'▣'),`openDept(${i})`)).join('')+'</div><h2>Registri e servizi</h2><div class="tiles">'+['Cruscotto','Inventario FEFO','Impostazioni',...Object.keys(schemas)].map(x=>tile(x,'▤',`go(\'${x}\')`)).join('')+'</div>'}else if(active==='Cella'){$('panel').innerHTML='<h2>'+esc(place)+'</h2><button onclick="go(\'Ricevimento merci\')">Carico merce</button> <button onclick="go(\'Temperature\')">Registra temperatura</button> <button onclick="go(\'Movimenti magazzino\')">Movimenti</button>';$('archive').innerHTML='<h2>Giacenze della cartella</h2>'+rowsHtml(inventory().filter(r=>locationOf(r)===place))}else{$('panel').innerHTML='<h2>'+esc(dept)+(sub?' / '+esc(sub):'')+'</h2>'+(active==='Reparto'?'<div class="tiles">'+departments[dept].map((x,i)=>tile(x,'▣',`openSub(${i})`)).join('')+'</div>':'<button onclick="go(\'Ricette e procedure\')">Nuova ricetta</button> <button onclick="go(\'Produzione\')">Nuova produzione</button>');
+if(active==='Categoria'&&dept==='Lavorazione pesce'&&sub==='Pesci'){
+  $('panel').insertAdjacentHTML('beforeend', `<details class="record">
+  <summary><strong>Specie di pesce</strong></summary>
+  <ul style="display:grid;grid-template-columns:repeat(auto-fit,minmax(115px,1fr));gap:6px 24px;padding-left:1.25rem">
+    <li>Acciuga (alice)</li>
+    <li>Aguglia</li>
+    <li>Alalunga</li>
+    <li>Branzino (spigola)</li>
+    <li>Cernia</li>
+    <li>Dentice</li>
+    <li>Gallinella</li>
+    <li>Lampuga</li>
+    <li>Merluzzo</li>
+    <li>Mormora</li>
+    <li>Nasello</li>
+    <li>Ombrina</li>
+    <li>Orata</li>
+    <li>Pagello</li>
+    <li>Palamita</li>
+    <li>Pesce San Pietro</li>
+    <li>Pesce spada</li>
+    <li>Rana pescatrice (coda di rospo)</li>
+    <li>Ricciola</li>
+    <li>Rombo</li>
+    <li>Sarago</li>
+    <li>Sardina</li>
+    <li>Scorfano</li>
+    <li>Sgombro</li>
+    <li>Sogliola</li>
+    <li>Tonno</li>
+    <li>Triglia</li>
+  </ul>
+</details>`);
+}
+$('archive').innerHTML='<h2>Archivio del reparto</h2>'+rowsHtml(scopedRows())}}else{originalRender();let f=$('entry');if(f&&active==='Ricette e procedure'&&dept){f.elements.Reparto.value=dept;f.elements['Categoria produzione'].value=sub}if(f&&active==='Temperature'&&place)f.elements.Attrezzatura.value=place;if(f&&active==='Ricevimento merci'&&place)f.elements.Ubicazione.value=place;if(active==='Produzione'&&dept){let p=$('prod');p.elements.Reparto.value=dept;for(let o of [...p.elements.recipe.options]){let r=db.find(x=>x.id===o.value);if(r&&(r.data.Reparto!==dept||(sub&&r.data['Categoria produzione']!==sub)))o.remove()}}} $('nav').innerHTML='<button onclick="home()">⌂ Cartelle principali</button> <button onclick="go(\'Cruscotto\')">Cruscotto</button>'+(dept?` <button onclick="active='Reparto';sub='';render()">Reparto</button>`:'')+(place?` <button onclick="active='Cella';render()">Torna alla cella</button>`:'');setLogo()};
 active='Home';render();
 
 
