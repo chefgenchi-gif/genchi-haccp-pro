@@ -76,6 +76,35 @@ function inventory(){return db.filter(r=>r.module==='Ricevimento merci'&&stock(r
 function status(r){let v=r.data.Scadenza;if(r.data.Esito!=='Conforme'||!v||expired(v))return 'BLOCCATO';return new Date(v)-Date.now()<72*3600000?'IN SCADENZA':'DISPONIBILE'}
 function drawInventory(){let q=($('searchStock')?.value||'').toLowerCase();let rows=inventory().filter(r=>[r.data.Prodotto,r.data['Lotto fornitore'],locationOf(r),r.data.Categoria].join(' ').toLowerCase().includes(q));$('stockResults').innerHTML=rows.map(r=>`<div class="record"><b>${esc(r.data.Prodotto)}</b> · ${esc(status(r))}<br>${esc(locationOf(r))} · Lotto ${esc(r.data['Lotto fornitore'])}<br>Scadenza ${esc(r.data.Scadenza)} · Residuo ${stock(r).toFixed(3)} ${esc(receiptUnit(r))} · Valore € ${(stock(r)*receiptPrice(r)).toFixed(2)}</div>`).join('')||'<p>Nessun lotto trovato.</p>'}
 render=function(){if(!['Cruscotto','Inventario FEFO','Impostazioni'].includes(active)){baseRender();if(active==='Produzione'){let f=$('prod');if(f){let inputs=[...f.querySelectorAll('input[name^="lot_"]')];inputs.sort((a,b)=>String(db.find(r=>r.id===a.name.slice(4))?.data.Scadenza).localeCompare(String(db.find(r=>r.id===b.name.slice(4))?.data.Scadenza)));let box=document.createElement('div');box.style.gridColumn='1/-1';box.innerHTML='<b>Prelievi ordinati per scadenza (FEFO)</b><p class="muted">Confermare sempre il lotto fisico effettivamente utilizzato.</p>';for(let i of inputs){let l=i.closest('label');if(l)box.append(l)}if(inputs.length)f.prepend(box)}}}else{ $('nav').innerHTML=Object.keys(schemas).map(k=>`<button class="secondary" onclick="active='${k}';render()">${k}</button>`).join('');$('archive').innerHTML='';let rows=inventory();if(active==='Cruscotto'){$('panel').innerHTML=`<h2>Controllo giornaliero</h2><div class="metrics"><div>Lotti in giacenza<b>${rows.length}</b></div><div>In scadenza entro 72 ore<b>${rows.filter(r=>status(r)==='IN SCADENZA').length}</b></div><div>Lotti bloccati<b>${rows.filter(r=>status(r)==='BLOCCATO').length}</b></div><div>Valore residuo teorico<b>€ ${rows.reduce((a,r)=>a+stock(r)*receiptPrice(r),0).toFixed(2)}</b></div></div><p class="muted">Valore delle materie prime registrate, non inventario contabile completo.</p><button onclick="active='Inventario FEFO';render()">Controlla giacenze e scadenze</button>`}else if(active==='Inventario FEFO'){$('panel').innerHTML='<h2>Inventario per scadenza</h2><input id="searchStock" placeholder="Cerca prodotto, lotto, cella o categoria" oninput="drawInventory()"><div id="stockResults"></div>';drawInventory()}else{$('panel').innerHTML='<h2>Impostazioni grafiche</h2><label>Carica logo originale FG<input type="file" accept="image/png,image/jpeg,image/webp" onchange="uploadLogo(this)"></label><p>Le attrezzature e i limiti validati si configurano nel registro Attrezzature.</p><p class="muted">Il logo è salvato soltanto su questo dispositivo.</p>'}}$('nav').insertAdjacentHTML('afterbegin',['Cruscotto','Inventario FEFO','Impostazioni'].map(k=>`<button class="${active===k?'':'secondary'}" onclick="active='${k}';render()">${k}</button>`).join(''));setLogo()};
+const speciePesce = [
+  ["Acciuga","Acciuga (alice)"],
+  ["Aguglia","Aguglia"],
+  ["Alalunga","Alalunga"],
+  ["Branzino","Branzino (spigola)"],
+  ["Cernia","Cernia"],
+  ["Dentice","Dentice"],
+  ["Gallinella","Gallinella"],
+  ["Lampuga","Lampuga"],
+  ["Merluzzo","Merluzzo"],
+  ["Mormora","Mormora"],
+  ["Nasello","Nasello"],
+  ["Ombrina","Ombrina"],
+  ["Orata","Orata"],
+  ["Pagello","Pagello"],
+  ["Palamita","Palamita"],
+  ["Pesce San Pietro","Pesce San Pietro"],
+  ["Pesce spada","Pesce spada"],
+  ["Rana pescatrice","Rana pescatrice (coda di rospo)"],
+  ["Ricciola","Ricciola"],
+  ["Rombo","Rombo"],
+  ["Sarago","Sarago"],
+  ["Sardina","Sardina"],
+  ["Scorfano","Scorfano"],
+  ["Sgombro","Sgombro"],
+  ["Sogliola","Sogliola"],
+  ["Tonno","Tonno"],
+  ["Triglia","Triglia"],
+];
 const departments={"Pasticceria":["Creme","Dessert","Torte","Farciture","Semifreddi","Mousse","Bavaresi","Ganache","Glasse","Gelati","Monoporzioni","Mignon","Biscotteria"],"Panificazione":["Pane","Focacce","Grissini","Pizza","Lievitati","Brioche","Impasti"],"Cucina calda":["Primi","Risotti","Secondi","Fondi","Salse","Contorni","Zuppe"],"Cucina fredda":["Antipasti","Insalate","Carpacci","Tartare","Emulsioni"],"Lavorazione carni":["Bovino","Suino","Ovino","Pollame","Selvaggina","Marinature","Porzionature"],"Lavorazione pesce":["Pesci","Molluschi","Crostacei","Filettature","Marinature","Sushi e sashimi"],"Gastronomia":["Semilavorati","Farciture","Conserve","Preparazioni vegetali"],"Finger food":["Freddi","Caldi","Fritti","Cialde","Meringhe salate"],"Buffet e banqueting":["Aperitivi","Buffet","Ricevimenti","Colazioni","Eventi"]};
 Object.assign(departments,{"Prima colazione dolce": ["Croissant", "Brioche", "Torte", "Crostate", "Pancake", "Waffle", "Creme", "Confetture", "Yogurt", "Cereali"], "Prima colazione salata": ["Uova", "Omelette", "Bacon", "Salumi", "Formaggi", "Focacce", "Sandwich", "Verdure"], "Buffet salato": ["Antipasti mare", "Antipasti terra", "Fritti", "Rustici", "Salumi", "Formaggi", "Insalate", "Gastronomia"], "Buffet dolce": ["Mignon", "Monoporzioni", "Dessert al cucchiaio", "Torte", "Semifreddi", "Mousse", "Gelati"], "Linea aperitivi": ["Canapè", "Tartellette", "Tartare", "Finger food", "Stuzzichini", "Cocktail", "Analcolici"], "Ristorante à la carte": ["Antipasti", "Primi", "Secondi", "Contorni", "Dessert"], "Fine dining": ["Amuse-bouche", "Antipasti", "Primi", "Secondi", "Predessert", "Dessert", "Piccola pasticceria"], "Wedding e banqueting": ["Aperitivi", "Angoli gastronomici", "Menu mare", "Menu terra", "Buffet finali", "Spuntini di mezzanotte"], "Room service": ["Colazioni", "Snack", "Piatti caldi", "Piatti freddi", "Dessert"], "Coffee break": ["Biscotteria", "Lievitati", "Mini sandwich", "Bevande"], "Buffet frutta": ["Frutta fresca", "Macedonie", "Frutta tagliata", "Composizioni"], "Show cooking": ["Primi", "Carni", "Pesce", "Fritture", "Dessert"], "Menu speciali e intolleranze": ["Vegano", "Vegetariano", "Senza glutine", "Senza lattosio", "Altre esigenze"]});
 let dept='',sub='',place='';
@@ -94,33 +123,7 @@ if(active==='Categoria'&&dept==='Lavorazione pesce'&&sub==='Pesci'){
   $('panel').insertAdjacentHTML('beforeend', `<details class="record">
   <summary><strong>Specie di pesce</strong></summary>
   <ul style="display:grid;grid-template-columns:repeat(auto-fit,minmax(115px,1fr));gap:6px 24px;padding-left:1.25rem">
-    <li>Acciuga (alice)</li>
-    <li>Aguglia</li>
-    <li>Alalunga</li>
-    <li>Branzino (spigola)</li>
-    <li>Cernia</li>
-    <li>Dentice</li>
-    <li>Gallinella</li>
-    <li>Lampuga</li>
-    <li>Merluzzo</li>
-    <li>Mormora</li>
-    <li>Nasello</li>
-    <li>Ombrina</li>
-    <li>Orata</li>
-    <li>Pagello</li>
-    <li>Palamita</li>
-    <li>Pesce San Pietro</li>
-    <li>Pesce spada</li>
-    <li>Rana pescatrice (coda di rospo)</li>
-    <li>Ricciola</li>
-    <li>Rombo</li>
-    <li>Sarago</li>
-    <li>Sardina</li>
-    <li>Scorfano</li>
-    <li>Sgombro</li>
-    <li>Sogliola</li>
-    <li>Tonno</li>
-    <li>Triglia</li>
+    ${speciePesce.map(([,descrizione]) => `<li>${esc(descrizione)}</li>`).join('')}
   </ul>
 </details>`);
 }
@@ -265,8 +268,107 @@ const previousSmartPreview=smartPreview;
 smartPreview=function(){previousSmartPreview();const f=$('batchStock');if(!f)return;f.noValidate=true;f.style.display='block';const notice=document.createElement('p');notice.setAttribute('role','alert');notice.style.cssText='white-space:pre-line;color:#9b2424;font-weight:bold';f.prepend(notice);const old=f.onsubmit;const fields=()=>[$('smartSupplier'),$('smartNumber'),$('smartDate'),f.elements.operator,...f.querySelectorAll('[data-row] [required]')];for(const el of fields()){el.required=true;el.addEventListener('input',()=>{el.style.outline='';el.removeAttribute('aria-invalid')});el.addEventListener('change',()=>{el.style.outline='';el.removeAttribute('aria-invalid')})}f.onsubmit=function(e){e.preventDefault();const missing=[];let first=null;const check=(el,label)=>{const bad=!el.value.trim()||!el.checkValidity();el.style.outline=bad?'2px solid #a12626':'';if(bad){el.setAttribute('aria-invalid','true');missing.push(label);first=first||el}else el.removeAttribute('aria-invalid')};check($('smartSupplier'),'Fornitore');check($('smartNumber'),'Numero documento');check($('smartDate'),'Data documento');check(f.elements.operator,'Operatore');for(const row of f.querySelectorAll('[data-row]')){const name=row.querySelector('legend').textContent;for(const el of row.querySelectorAll('[required]'))check(el,name+' — '+el.closest('label').childNodes[0].textContent.trim());if(row.querySelector('[name=result]').value==='Non conforme')check(row.querySelector('[name=action]'),name+' — Azione correttiva');}if(missing.length){notice.textContent='Carico non registrato. Campi da completare: '+missing.join('; ');first.scrollIntoView({block:'center'});first.focus({preventScroll:true});return;}notice.textContent='';old.call(f,e);};};
 
 // Correzione ricette: categoria vincolata, ingredienti da anagrafica magazzino.
-const fgRecipeRender=render;
-render=function(){fgRecipeRender();if(active!=='Ricette e procedure')return;const f=$('entry');if(!f)return;const d=f.elements.Reparto,c=f.elements['Categoria produzione'],t=f.elements['Ingredienti e grammature'];if(dept){d.value=dept;d.readOnly=true;}if(sub){c.value=sub;c.readOnly=true;}const names=[...new Set(db.filter(r=>r.module==='Ricevimento merci').map(r=>r.data.Prodotto).filter(Boolean))].sort();const box=document.createElement('div');box.style.gridColumn='1/-1';box.innerHTML=`<label>Ingrediente dal magazzino<select id="fgIng"><option value="">Seleziona</option>${names.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('')}</select></label><label>Quantità<input id="fgQty" type="number" min="0.001" step="any"></label><label>Unità<select id="fgUnit">${units.map(u=>`<option>${u}</option>`).join('')}</select></label><button type="button" id="fgAddIng">Aggiungi ingrediente</button>`;t.closest('label').before(box);$('fgIng').onchange=()=>{const r=db.find(r=>r.module==='Ricevimento merci'&&r.data.Prodotto===$('fgIng').value);if(r)$('fgUnit').value=receiptUnit(r)};$('fgAddIng').onclick=()=>{let n=$('fgIng').value,q=Number($('fgQty').value),u=$('fgUnit').value;if(!n||!Number.isFinite(q)||q<=0)return alert('Selezionare ingrediente e quantità');t.value+=(t.value.trim()?'\n':'')+[n,q,u].join('; ');$('fgQty').value='';};const prev=f.onsubmit;f.onsubmit=e=>{e.preventDefault();try{if(!departments[d.value]?.includes(c.value))throw Error('Selezionare reparto e categoria corretti');const lines=recipeLines({data:{'Ingredienti e grammature':t.value}});if(!lines.length)throw Error('Inserire almeno un ingrediente');for(const x of lines){if(!names.includes(x.n))throw Error('Ingrediente non presente nel magazzino: '+x.n);} }catch(err){return alert(err.message)}return prev.call(f,e);};};
+function specieDaCaricare(reparto, magazzino) {
+  if (reparto !== 'Lavorazione pesce') return [];
+  const giaCaricate = new Set(magazzino.map(nome => nome.toLowerCase()));
+  return speciePesce.filter(([nome]) => !giaCaricate.has(nome.toLowerCase()));
+}
+
+function nomiIngredienti(reparto, magazzino) {
+  return new Set([...magazzino, ...(reparto === 'Lavorazione pesce' ? speciePesce.map(([nome]) => nome) : [])]);
+}
+
+function aggiungiSceltaIngredienti(form, reparto, magazzino) {
+  const righe = form.elements['Ingredienti e grammature'];
+  const box = document.createElement('div');
+  box.style.gridColumn = '1/-1';
+  box.innerHTML = `<label>Ingrediente<select id="fgIng"></select></label>
+    <p class="muted" id="fgIngInfo" aria-live="polite" hidden></p>
+    <label>Quantità<input id="fgQty" type="number" min="0.001" step="any"></label>
+    <label>Unità<select id="fgUnit">${units.map(u => `<option>${u}</option>`).join('')}</select></label>
+    <button type="button" id="fgAddIng">Aggiungi ingrediente</button>`;
+  righe.closest('label').before(box);
+  const scelta = box.querySelector('#fgIng');
+  const quantita = box.querySelector('#fgQty');
+  const unita = box.querySelector('#fgUnit');
+  const info = box.querySelector('#fgIngInfo');
+
+  function aggiornaOpzioni() {
+    const valore = scelta.value;
+    scelta.replaceChildren(new Option('Seleziona', ''));
+    const gruppi = [
+      ['Dal magazzino', magazzino.map(nome => [nome, nome])],
+      ['Specie di pesce da caricare', specieDaCaricare(reparto.value, magazzino)],
+    ];
+    for (const [etichetta, voci] of gruppi) {
+      if (!voci.length) continue;
+      const gruppo = document.createElement('optgroup');
+      gruppo.label = etichetta;
+      for (const [nome, descrizione] of voci) gruppo.append(new Option(descrizione, nome));
+      scelta.append(gruppo);
+    }
+    scelta.value = nomiIngredienti(reparto.value, magazzino).has(valore) ? valore : '';
+    info.hidden = !scelta.value || magazzino.includes(scelta.value);
+  }
+
+  info.textContent = 'Puoi usare questa specie nella ricetta. Per produrre, carica prima il lotto in magazzino con lo stesso nome.';
+  scelta.onchange = () => {
+    const lotto = db.find(r => r.module === 'Ricevimento merci' && r.data.Prodotto === scelta.value);
+    unita.value = lotto ? receiptUnit(lotto) : 'kg';
+    info.hidden = !scelta.value || Boolean(lotto);
+  };
+  box.querySelector('#fgAddIng').onclick = () => {
+    const dose = Number(quantita.value);
+    if (!scelta.value || !Number.isFinite(dose) || dose <= 0) {
+      return alert('Selezionare ingrediente e quantità');
+    }
+    righe.value += (righe.value.trim() ? '\n' : '') + [scelta.value, dose, unita.value].join('; ');
+    quantita.value = '';
+  };
+  reparto.addEventListener('input', aggiornaOpzioni);
+  aggiornaOpzioni();
+}
+
+const fgRecipeRender = render;
+render = function () {
+  fgRecipeRender();
+  if (active !== 'Ricette e procedure') return;
+  const form = $('entry');
+  if (!form) return;
+  const reparto = form.elements.Reparto;
+  const categoria = form.elements['Categoria produzione'];
+  if (dept) {
+    reparto.value = dept;
+    reparto.readOnly = true;
+  }
+  if (sub) {
+    categoria.value = sub;
+    categoria.readOnly = true;
+  }
+  const names=[...new Set(db.filter(r=>r.module==='Ricevimento merci').map(r=>r.data.Prodotto).filter(Boolean))].sort();
+  aggiungiSceltaIngredienti(form, reparto, names);
+  const salva = form.onsubmit;
+  form.onsubmit = e => {
+    e.preventDefault();
+    try {
+      if (!departments[reparto.value]?.includes(categoria.value)) {
+        throw Error('Selezionare reparto e categoria corretti');
+      }
+      const righe = recipeLines({ data: {
+        'Ingredienti e grammature': form.elements['Ingredienti e grammature'].value
+      } });
+      if (!righe.length) throw Error('Inserire almeno un ingrediente');
+      const consentiti = nomiIngredienti(reparto.value, names);
+      for (const riga of righe) {
+        if (!consentiti.has(riga.n)) throw Error('Ingrediente non disponibile per la ricetta: ' + riga.n);
+      }
+    } catch (errore) {
+      return alert(errore.message);
+    }
+    return salva.call(form, e);
+  };
+};
+
 
 // Mostra ricette storiche del reparto anche se la categoria è errata; non utilizzarle senza verifica.
 function fgRecipeIssues(r){const issues=[];if(!departments[r.data.Reparto]?.includes(r.data['Categoria produzione']))issues.push('categoria da correggere');try{const lines=recipeLines(r);if(!lines.length)throw Error();for(const x of lines){if(!db.some(y=>y.module==='Ricevimento merci'&&y.data.Prodotto===x.n))issues.push('ingrediente non associato al magazzino: '+x.n)}}catch(e){issues.push('grammature o unità da correggere')}if(/non validata|solo collaudo/i.test(r.data['Procedura validata']||''))issues.push('procedura non validata');return issues;}
@@ -275,7 +377,7 @@ render=function(){fgVisibleRender();if(active!=='Produzione')return;const f=$('p
 
 const fgEditRender=render;
 render=function(){fgEditRender();if(!['Reparto','Categoria','Ricette e procedure'].includes(active))return;const a=$('archive');if(!a)return;const rows=db.filter(r=>r.module==='Ricette e procedure'&&(!dept||r.data.Reparto===dept)&&(!sub||r.data['Categoria produzione']===sub));if(!rows.length)return;const box=document.createElement('section');box.innerHTML='<h2>Modifica ricette archiviate</h2>';for(const r of rows){const b=document.createElement('button');b.type='button';b.textContent='Modifica ricetta — '+r.data.Preparazione;b.style.margin='4px';b.onclick=()=>fgEditRecipe(r.id);box.append(b)}a.append(box)};
-function fgEditRecipe(id){const r=db.find(x=>x.id===id&&x.module==='Ricette e procedure');if(!r)return;const d=r.data;const a=$('panel');a.innerHTML='<h2>Modifica ricetta</h2><p>Le modifiche invalidano la procedura precedente. La produzione resta bloccata fino a validazione effettiva.</p><form id="fgEditForm"></form>';const f=$('fgEditForm');for(const k of ['Operatore','Preparazione','Lavorazione','Confezionamento','Abbattimento previsto','Conservazione','Allergeni','Porzioni base','Durata validata ore','Ingredienti e grammature']){const l=document.createElement('label');l.textContent=k;const t=document.createElement(k==='Ingredienti e grammature'?'textarea':'input');t.name=k;t.value=d[k]||'';t.required=true;l.append(t);f.append(l)}const addSelect=(k,values,value)=>{const l=document.createElement('label');l.textContent=k;const t=document.createElement('select');t.name=k;t.required=true;for(const v of values)t.add(new Option(v,v));t.value=value;l.append(t);f.append(l);return t};const dep=addSelect('Reparto',Object.keys(departments),d.Reparto);const cat=addSelect('Categoria produzione',departments[dep.value]||[],d['Categoria produzione']);dep.onchange=()=>{cat.replaceChildren(...(departments[dep.value]||[]).map(v=>new Option(v,v)))};const names=[...new Set(db.filter(x=>x.module==='Ricevimento merci').map(x=>x.data.Prodotto).filter(Boolean))].sort();const ing=addSelect('Ingrediente dal magazzino',['',...names],'');ing.required=false;const q=document.createElement('input');q.type='number';q.min='0.001';q.step='any';q.placeholder='Quantità';f.append(q);const u=addSelect('Unità ingrediente',units,'kg');u.required=false;ing.onchange=()=>{const x=db.find(x=>x.module==='Ricevimento merci'&&x.data.Prodotto===ing.value);if(x)u.value=receiptUnit(x)};const add=document.createElement('button');add.type='button';add.textContent='Aggiungi ingrediente';add.onclick=()=>{if(!ing.value||!(Number(q.value)>0))return alert('Selezionare ingrediente e quantità');const t=f.elements['Ingredienti e grammature'];t.value+=(t.value.trim()?'\n':'')+[ing.value,q.value,u.value].join(';');q.value=''};f.append(add);const b=document.createElement('button');b.textContent='Salva modifiche online';f.append(b);const cancel=document.createElement('button');cancel.type='button';cancel.textContent='Annulla';cancel.onclick=()=>render();f.append(cancel);f.onsubmit=async e=>{e.preventDefault();const data={...d,...Object.fromEntries(new FormData(f))};delete data['Ingrediente dal magazzino'];delete data['Unità ingrediente'];data['Procedura validata']='Non validata dopo modifica';try{if(!departments[data.Reparto]?.includes(data['Categoria produzione']))throw Error('Categoria non valida');if(!Number.isInteger(Number(data['Porzioni base']))||Number(data['Porzioni base'])<1||Number(data['Porzioni base'])>1000)throw Error('Porzioni base non valide');const lines=recipeLines({data});if(!lines.length||lines.some(x=>!names.includes(x.n)))throw Error('Correggere ingredienti e unità');b.disabled=true;await window.fgUpdateRecipe(r,{...r,data});render();alert('Ricetta aggiornata online')}catch(err){alert(err.message);b.disabled=false}};a.scrollIntoView({block:'start'})}
+function fgEditRecipe(id){const r=db.find(x=>x.id===id&&x.module==='Ricette e procedure');if(!r)return;const d=r.data;const a=$('panel');a.innerHTML='<h2>Modifica ricetta</h2><p>Le modifiche invalidano la procedura precedente. La produzione resta bloccata fino a validazione effettiva.</p><form id="fgEditForm"></form>';const f=$('fgEditForm');for(const k of ['Operatore','Preparazione','Lavorazione','Confezionamento','Abbattimento previsto','Conservazione','Allergeni','Porzioni base','Durata validata ore','Ingredienti e grammature']){const l=document.createElement('label');l.textContent=k;const t=document.createElement(k==='Ingredienti e grammature'?'textarea':'input');t.name=k;t.value=d[k]||'';t.required=true;l.append(t);f.append(l)}const addSelect=(k,values,value)=>{const l=document.createElement('label');l.textContent=k;const t=document.createElement('select');t.name=k;t.required=true;for(const v of values)t.add(new Option(v,v));t.value=value;l.append(t);f.append(l);return t};const dep=addSelect('Reparto',Object.keys(departments),d.Reparto);const cat=addSelect('Categoria produzione',departments[dep.value]||[],d['Categoria produzione']);dep.onchange=()=>{cat.replaceChildren(...(departments[dep.value]||[]).map(v=>new Option(v,v)))};const names=[...new Set(db.filter(x=>x.module==='Ricevimento merci').map(x=>x.data.Prodotto).filter(Boolean))].sort();aggiungiSceltaIngredienti(f,dep,names);const b=document.createElement('button');b.textContent='Salva modifiche online';f.append(b);const cancel=document.createElement('button');cancel.type='button';cancel.textContent='Annulla';cancel.onclick=()=>render();f.append(cancel);f.onsubmit=async e=>{e.preventDefault();const data={...d,...Object.fromEntries(new FormData(f))};data['Procedura validata']='Non validata dopo modifica';try{if(!departments[data.Reparto]?.includes(data['Categoria produzione']))throw Error('Categoria non valida');if(!Number.isInteger(Number(data['Porzioni base']))||Number(data['Porzioni base'])<1||Number(data['Porzioni base'])>1000)throw Error('Porzioni base non valide');const lines=recipeLines({data});const consentiti=nomiIngredienti(data.Reparto,names);if(!lines.length||lines.some(x=>!consentiti.has(x.n)))throw Error('Correggere ingredienti e unità');b.disabled=true;await window.fgUpdateRecipe(r,{...r,data});render();alert('Ricetta aggiornata online')}catch(err){alert(err.message);b.disabled=false}};a.scrollIntoView({block:'start'})}
 (()=>{const previous=render;render=function(){previous();if(active==='Produzione'){const b=document.createElement('button');b.type='button';b.textContent='Simula produzione — nessun salvataggio';b.onclick=simulate; $('panel').prepend(b)}};
 function simulate(){const f=$('prod'),r=db.find(x=>x.id===f.elements.recipe.value);if(!r)return alert('Selezionare una ricetta');try{const n=Number($('prodPort').value),lines=scaled(r,n);if(!lines.length)throw Error('Ricetta senza ingredienti');const lots=db.filter(x=>x.module==='Ricevimento merci'&&x.data.Esito==='Conforme'&&x.data.Scadenza&&!expired(x.data.Scadenza)&&stock(x)>0).sort((a,b)=>String(a.data.Scadenza).localeCompare(String(b.data.Scadenza)));const picks=new Map(),missing=[];for(const x of lines){let left=x.q;for(const l of lots){if(String(l.data.Prodotto).trim().toLowerCase()!==x.n.trim().toLowerCase())continue;const k=factor(x.u,receiptUnit(l));if(k===null)continue;const q=Math.floor(Math.min(left*k,Math.max(0,stock(l)-(picks.get(l.id)||0)))*1000+1e-8)/1000;if(q>0){picks.set(l.id,(picks.get(l.id)||0)+q);left-=q/k}if(left<1e-8)break}if(left>1e-8)missing.push(`${x.n}: ${left.toFixed(6)} ${x.u} mancanti`)}const old=$('fgSimulation');if(old)old.remove();const box=document.createElement('section');box.id='fgSimulation';box.style.border='2px dashed #9b4300';const h=document.createElement('h2');h.textContent='SIMULAZIONE — NON VALIDA PER HACCP';box.append(h);const add=t=>{const p=document.createElement('p');p.textContent=t;box.append(p)};add(`${r.data.Preparazione} — ${n} porzioni`);add('Ingredienti: '+lines.map(x=>`${x.n}: ${x.q.toFixed(3)} ${x.u}`).join(' · '));for(const l of lots){const q=picks.get(l.id);if(q)add(`${l.data.Prodotto} | lotto ${l.data['Lotto fornitore']} | scadenza ${l.data.Scadenza} | prelievo ${q.toFixed(3)} ${receiptUnit(l)} | residuo simulato ${(stock(l)-q).toFixed(3)} ${receiptUnit(l)}`)}if(missing.length){add('Simulazione incompleta: '+missing.join(' · '));add('Nessun prodotto finito simulato.')}else{add('Lotto virtuale SIM-'+Date.now());add('Prodotto finito teorico: '+n+' porzioni. Peso effettivo non misurato.');add('Tracciabilità virtuale: ricetta '+r.id+' → lotti sopra indicati → lotto virtuale.')}add('Nessun movimento, lotto reale o registrazione online creati. Nessuna scadenza o procedura validata.');$('panel').prepend(box);box.scrollIntoView({block:'start'});}catch(e){alert(e.message)}}})();
 
