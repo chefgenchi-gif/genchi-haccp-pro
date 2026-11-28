@@ -50,6 +50,17 @@ begin
 
   perform SCHEMA_TEST.haccp_registra_produzione(registrazione);
   perform SCHEMA_TEST.haccp_registra_produzione(registrazione);
+  begin
+    perform SCHEMA_TEST.haccp_registra_produzione(
+      jsonb_set(registrazione,'{data,prelievi,LOT-TEST}','4')
+    );
+    raise exception 'Riutilizzo dell’ID con quantità diversa accettato';
+  exception when unique_violation then null;
+  end;
+  if (select count(*) from SCHEMA_TEST.haccp_archive
+      where owner_id=titolare and module='Produzione') <> 1 then
+    raise exception 'Produzione duplicata';
+  end if;
   avvisi := SCHEMA_TEST.haccp_leggi_avvisi_prelievo();
   if jsonb_array_length(avvisi)<>1 or (avvisi->0->>'prelevato')::numeric<>5
      or (avvisi->0->>'residuo')::numeric<>0
@@ -66,5 +77,5 @@ begin
   end;
 end;
 $$;
-select 'PASS revisione approvata e revisione errata respinta, rollback, un solo avviso, saldo zero, nuovo prelievo respinto' as esito;
+select 'PASS revisione approvata e revisione errata respinta, rollback, un solo avviso, conflitto identificativo respinto, saldo zero, nuovo prelievo respinto' as esito;
 rollback;
