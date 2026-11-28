@@ -92,7 +92,76 @@ const v7Render=render;
 function localDateTime(d){const z=new Date(d.getTime()-d.getTimezoneOffset()*60000);return z.toISOString().slice(0,16)}
 function expiryProposal(hours,start=new Date()){return Number(hours)>0&&Number.isFinite(Number(hours))?localDateTime(new Date(start.getTime()+Number(hours)*3600000)):''}
 function calculator(){return `<h2>Calcolatore unico delle produzioni</h2><p class="muted">Le quantità sono teoriche; confermare sempre i prelievi reali.</p><label>Porzioni base<input id="basePort" type="number" min="1" max="1000" value="10"></label><label>Porzioni richieste<input id="targetPort" type="number" min="1" max="1000" value="20"></label><label>Ingredienti: una riga per ingrediente, nome; quantità; unità; prezzo per unità (facoltativo)<textarea id="calcLines" rows="6" placeholder="Polpo; 2; kg; 12.50"></textarea></label><button onclick="calculateShared()">Calcola</button><div id="calcResult"></div>`}
-function calculateShared(){let a=Number($('basePort').value),b=Number($('targetPort').value);if(!Number.isInteger(a)||!Number.isInteger(b)||a<1||b<1||a>1000||b>1000)return alert('Porzioni da 1 a 1000');let total=0,missing=false;let rows=$('calcLines').value.trim().split('\n').filter(Boolean).map(l=>{let [n,q,u,p]=l.split(';').map(x=>x.trim());let qty=Number(q?.replace(',','.'));let price=Number(p?.replace(',','.'));if(!n||!u||!Number.isFinite(qty)||qty<=0)throw Error('Verificare ingredienti e quantità');let cost=p&&Number.isFinite(price)&&price>=0?qty*b/a*price:null;if(cost===null)missing=true;else total+=cost;return `<div class="record"><b>${esc(n)}</b> — ${(qty*b/a).toFixed(3)} ${esc(u)} ${cost===null?'': ' · € '+cost.toFixed(2)}</div>`});$('calcResult').innerHTML=rows.join('')+`<p><b>${missing?'Costo parziale':'Costo totale'}: € ${total.toFixed(2)}</b></p>`}
+function calculateShared() {
+  const base = Number($('basePort').value);
+  const richieste = Number($('targetPort').value);
+  if (!Number.isInteger(base) || !Number.isInteger(richieste) ||
+      base < 1 || richieste < 1 || base > 1000 || richieste > 1000) {
+    return alert('Porzioni da 1 a 1000');
+  }
+
+  const risultato = $('calcResult');
+  const densitaInserite = new Map(
+    [...risultato.querySelectorAll('[data-densita]')].map(input => [input.dataset.densita, input.value])
+  );
+  const righe = $('calcLines').value.trim().split('\n').filter(riga => riga.trim()).map((riga, i) => {
+    const [nome, q, unita, p] = riga.split(';').map(valore => valore.trim());
+    const quantita = Number(q?.replace(',', '.'));
+    const prezzo = Number(p?.replace(',', '.'));
+    if (!nome || !unita || !Number.isFinite(quantita) || quantita <= 0) {
+      throw Error('Verificare ingredienti e quantità');
+    }
+    const dose = quantita * richieste / base;
+    const costo = p && Number.isFinite(prezzo) && prezzo >= 0 ? dose * prezzo : null;
+    const unitaNormalizzata = normalizeUnit(unita);
+    return { nome, dose, unita, unitaNormalizzata, costo, chiave: i + '|' + nome + '|' + unitaNormalizzata };
+  });
+
+  const totale = righe.reduce((somma, riga) => somma + (riga.costo ?? 0), 0);
+  const parziale = righe.some(riga => riga.costo === null);
+  risultato.innerHTML = righe.map(({ nome, dose, unita, costo }) =>
+    `<div class="record"><b>${esc(nome)}</b> · ${dose.toFixed(3)} ${esc(unita)}${costo === null ? '' : ' · € ' + costo.toFixed(2)}</div>`
+  ).join('') + `<p><b>${parziale ? 'Costo parziale' : 'Costo totale'}: € ${totale.toFixed(2)}</b></p>`;
+
+  const liquidi = righe.filter(riga => riga.unitaNormalizzata === 'ml' || riga.unitaNormalizzata === 'l');
+  if (!liquidi.length) return;
+
+  const sezione = document.createElement('section');
+  sezione.innerHTML = '<h3>Conversione liquidi in grammi</h3><p class="muted">Usa la densità indicata dal produttore oppure pesa 100 ml al netto del contenitore e dividi i grammi per 100.</p>';
+  const formato = new Intl.NumberFormat('it-IT', { maximumFractionDigits: 2 });
+  for (const { nome, dose, unitaNormalizzata, chiave } of liquidi) {
+    const scheda = document.createElement('div');
+    scheda.className = 'record';
+    scheda.innerHTML = `<b>${esc(nome)}</b><br>
+      <label>Densità indicativa o misurata (g/ml)<input type="text" inputmode="decimal" maxlength="12" placeholder="Es. 0,92" autocomplete="off"></label>
+      <output aria-live="polite"></output>`;
+    const input = scheda.querySelector('input');
+    const peso = scheda.querySelector('output');
+    const ml = unitaNormalizzata === 'l' ? dose * 1000 : dose;
+    const nomeNormalizzato = nome.trim().toLowerCase().replace(/\s+/g, ' ');
+    const acqua = ['acqua', 'acqua naturale', 'acqua potabile', 'acqua minerale'].includes(nomeNormalizzato);
+    const olio = /^(olio evo|olio extra vergine di oliva|olio extra vergine d['’]oliva|olio extravergine di oliva|olio extravergine d['’]oliva|olio di oliva|olio d['’]oliva)$/.test(nomeNormalizzato);
+    input.dataset.densita = chiave;
+    input.value = densitaInserite.get(chiave) ?? (acqua ? '1' : olio ? '0,92' : '');
+
+    function aggiornaPeso() {
+      const valore = input.value.trim();
+      const densita = Number(valore.replace(',', '.'));
+      const grammi = ml * densita;
+      const valida = /^(?:\d+(?:[.,]\d+)?|[.,]\d+)$/.test(valore) &&
+        densita > 0 && Number.isFinite(grammi);
+      input.setAttribute('aria-invalid', String(Boolean(valore) && !valida));
+      const volume = formato.format(ml) + ' ml';
+      peso.textContent = valida ? volume + ' ≈ ' + formato.format(grammi) + ' g'
+        : volume + (valore ? ' · Inserisci una densità positiva.' : ' · Inserisci la densità per vedere i grammi.');
+    }
+
+    input.addEventListener('input', aggiornaPeso);
+    aggiornaPeso();
+    sezione.append(scheda);
+  }
+  risultato.append(sezione);
+}
 render=function(){v7Render();if(active==='Calcolatore unico'){$('panel').innerHTML=calculator();$('archive').innerHTML='';$('panel').querySelector('button').onclick=()=>{try{calculateShared()}catch(e){alert(e.message)}}}if(active==='Home')$('panel').insertAdjacentHTML('afterbegin','<div class="tiles">'+tile('Calcolatore unico','🧮',"go('Calcolatore unico')")+'</div>');if(active==='Categoria'||active==='Reparto')$('panel').insertAdjacentHTML('beforeend',` <button onclick="go('Calcolatore unico')">Calcolatore unico</button>`);if(active==='Produzione'){let f=$('prod');if(f){let sel=f.elements.recipe,old=sel.onchange;sel.onchange=e=>{old?.(e);let r=db.find(x=>x.id===sel.value);if(r){f.elements['Scadenza validata'].value=expiryProposal(r.data['Durata validata ore']);$('recipeInfo').insertAdjacentHTML('beforeend','<p class="warn">Scadenza proposta dalla durata configurata: confermare il riferimento temporale e la procedura prima di registrare.</p>')}}}}if(active==='Ricevimento merci'){let f=$('entry');if(f){let p=f.elements.Prodotto;p.oninput=()=>{let c=classify(p.value);if(c){f.elements.Categoria.value=c;suggest(f)}}}}};
 // Calcolatore è una vista, non un registro.
 const v8Render=render;render=function(){if(active==='Calcolatore unico'){$('nav').innerHTML='<button onclick="home()">⌂ Cartelle principali</button>'+(dept?'<button onclick="go(\'Categoria\')">Torna al reparto</button>':'');$('panel').innerHTML=calculator();$('archive').innerHTML='';$('panel').querySelector('button').onclick=()=>{try{calculateShared()}catch(e){alert(e.message)}};return}v8Render()};
