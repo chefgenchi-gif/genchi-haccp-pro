@@ -69,6 +69,31 @@ try {
   const {rows} = await db.query("select prelevato::int,residuo::int from haccp_private.avvisi_prelievo where lotto_id='A'");
   assert.deepEqual(rows,[{prelevato:4,residuo:1}]);
   assert.equal((await db.query("select count(*)::int as n from public.haccp_archive where module='Produzione'")).rows[0].n,1);
+  // L'ultimo kg deve tornare disponibile dopo il rollback della prima sessione.
+  const ultimo = (c,n) => c.query('select public.haccp_registra_produzione($1::jsonb)',[
+    {...produzione(n),data:{...produzione(n).data,prelievi:{A:1}}},
+  ]);
+  await a.query('begin');
+  await ultimo(a,3);
+  const concorrente = ultimo(b,4);
+  try {
+    let bloccato = false;
+    for (let i=0;i<50;i++) {
+      const {rows}=await db.query("select 1 from pg_locks where pid=$1 and locktype='advisory' and not granted",[pid]);
+      if(rows.length){bloccato=true; break;}
+      await new Promise(f=>setTimeout(f,20));
+    }
+    assert.ok(bloccato,'La seconda sessione deve attendere anche prima del rollback');
+  } finally {
+    await a.query('rollback');
+    await concorrente;
+  }
+  const finale = await db.query("select produzione_id,prelevato::int,residuo::int from haccp_private.avvisi_prelievo order by sequenza");
+  assert.deepEqual(finale.rows,[
+    {produzione_id:produzione(1).id,prelevato:4,residuo:1},
+    {produzione_id:produzione(4).id,prelevato:1,residuo:0},
+  ]);
+  console.log('PASS rollback concorrente: nessun avviso residuo, ultimo kg assegnato alla seconda sessione');
   console.log('PASS: due sessioni simultanee, seconda in attesa del lock, un solo prelievo e residuo 1 kg');
 } finally {
   for(const c of clients) await c.end();
