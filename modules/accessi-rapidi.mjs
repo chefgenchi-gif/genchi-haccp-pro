@@ -47,20 +47,15 @@ export function aggiungiAccessiRapidi(panel, apri) {
   manuale.append(nomeManuale, statoManuale);
   manuale.onclick = async () => {
     manuale.disabled = true;
-    statoManuale.textContent = 'Caricamento del PDF…';
+    statoManuale.textContent = 'Apertura del manuale…';
     try {
-      const url = await window.fgLeggiManuale();
+      const { apriManuale } = await import('./lettore-manuale.mjs');
       if (!manuale.isConnected) return;
-      const apriPdf = document.createElement('a');
-      apriPdf.href = url;
-      apriPdf.target = '_blank';
-      apriPdf.rel = 'noopener';
-      apriPdf.textContent = 'Apri il manuale (PDF)';
-      apriPdf.className = 'tile';
-      manuale.replaceWith(apriPdf);
-      apriPdf.focus();
+      apriManuale(() => window.fgLeggiManuale(), manuale);
+      statoManuale.textContent = 'Guida PDF con tutti i passaggi';
     } catch {
-      statoManuale.textContent = 'PDF non disponibile. Tocca per riprovare.';
+      statoManuale.textContent = 'Manuale non disponibile. Tocca per riprovare.';
+    } finally {
       manuale.disabled = false;
     }
   };
