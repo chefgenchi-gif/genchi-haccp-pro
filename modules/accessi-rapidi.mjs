@@ -35,6 +35,36 @@ export function aggiungiAccessiRapidi(panel, apri) {
     };
     grid.append(button);
   }
+  const manuale = document.createElement('button');
+  manuale.type = 'button';
+  manuale.className = 'tile';
+  const nomeManuale = document.createElement('strong');
+  nomeManuale.textContent = 'Manuale illustrato';
+  const statoManuale = document.createElement('small');
+  statoManuale.style.display = 'block';
+  statoManuale.setAttribute('role', 'status');
+  statoManuale.textContent = 'Guida PDF con tutti i passaggi';
+  manuale.append(nomeManuale, statoManuale);
+  manuale.onclick = async () => {
+    manuale.disabled = true;
+    statoManuale.textContent = 'Caricamento del PDF…';
+    try {
+      const url = await window.fgLeggiManuale();
+      if (!manuale.isConnected) return;
+      const apriPdf = document.createElement('a');
+      apriPdf.href = url;
+      apriPdf.target = '_blank';
+      apriPdf.rel = 'noopener';
+      apriPdf.textContent = 'Apri il manuale (PDF)';
+      apriPdf.className = 'tile';
+      manuale.replaceWith(apriPdf);
+      apriPdf.focus();
+    } catch {
+      statoManuale.textContent = 'PDF non disponibile. Tocca per riprovare.';
+      manuale.disabled = false;
+    }
+  };
+  grid.append(manuale);
   section.append(title, grid);
   panel.prepend(section);
 }

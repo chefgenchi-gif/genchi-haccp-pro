@@ -197,6 +197,22 @@ window.fgSaveOrder=async ordine=>{
   if(!known.has(ordine.id)) throw Error('Ordine in sospeso. Riprova il salvataggio con gli stessi dati.');
   if(active==='Ordini fornitori') render();
 };
+let urlManuale;
+window.fgLeggiManuale = async () => {
+  if (!owner) throw Error('Accedi per aprire il manuale.');
+  if (urlManuale) return urlManuale;
+  const sessione = client;
+  const utente = owner;
+  const { data, error } = await sessione.from('haccp_manuals')
+    .select('pdf_base64').eq('slug', 'illustrato').single();
+  if (error || !data?.pdf_base64 || client !== sessione || owner !== utente) {
+    throw Error('Manuale non disponibile.');
+  }
+  const bytes = Uint8Array.from(atob(data.pdf_base64), char => char.charCodeAt(0));
+  if (urlManuale) return urlManuale;
+  urlManuale = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+  return urlManuale;
+};
 const archivioFoto=()=>client.storage.from('haccp-foto-ricette');
 const percorsoFoto=id=>owner+'/'+id+'/foto';
 window.fgFotoRicetta={
@@ -279,7 +295,12 @@ retry.after(refresh);
 window.addEventListener('beforeunload',e=>{if(owner&&(busy||db.some(r=>!known.has(r.id)))){e.preventDefault();e.returnValue=''}});
 async function start(){if(!window.supabase){msg('Connessione non disponibile. Ricaricare la pagina.');return}try{client=make(localStorage.getItem('fg-haccp-remember')!=='no');const {data,error}=await client.auth.getUser();if(!error&&data.user)await enter(data.user);else show(false)}catch(e){msg('Impossibile verificare la sessione.')}}
 el('fgLoginForm').addEventListener('submit',async e=>{e.preventDefault();const b=e.target.querySelector('button');b.disabled=true;msg('Verifica accesso…');try{if(!window.supabase)throw Error();const remember=el('fgRemember').checked;localStorage.setItem('fg-haccp-remember',remember?'yes':'no');(remember?sessionStorage:localStorage).removeItem('fg-haccp-auth');client=make(remember);const {error}=await client.auth.signInWithPassword({email:el('fgEmail').value.trim(),password:el('fgPassword').value});if(error){msg('Accesso non riuscito. Verifica le credenziali.');return}el('fgPassword').value='';msg('');const {data,error:verifyError}=await client.auth.getUser();if(verifyError||!data.user)throw Error();await enter(data.user)}catch(e){msg('Connessione non disponibile. Riprova.')}finally{b.disabled=false}});
-el('fgLogout').onclick=async()=>{if(busy||db.some(r=>!known.has(r.id)))return alert('Salvare o esportare le registrazioni prima di uscire');chiudiAvvisi?.();chiudiAvvisi=undefined;show(false);owner=null;db=[];known.clear();revisions.clear();productionAttempt=undefined;render();try{await client.auth.signOut({scope:'local'})}finally{localStorage.removeItem('fg-haccp-auth');sessionStorage.removeItem('fg-haccp-auth');msg('Sessione terminata.')}};start();})();
+el('fgLogout').onclick=async()=>{if(busy||db.some(r=>!known.has(r.id)))return alert('Salvare o esportare le registrazioni prima di uscire');chiudiAvvisi?.();chiudiAvvisi=undefined;show(false);owner=null;
+if (urlManuale) {
+  URL.revokeObjectURL(urlManuale);
+  urlManuale = undefined;
+}
+db=[];known.clear();revisions.clear();productionAttempt=undefined;render();try{await client.auth.signOut({scope:'local'})}finally{localStorage.removeItem('fg-haccp-auth');sessionStorage.removeItem('fg-haccp-auth');msg('Sessione terminata.')}};start();})();
 </script><script type="module">
 import {preparaEtichetta} from './modules/etichetta-abbattimento.mjs';
 const button=document.createElement('button');button.textContent='Abbattimento ed etichette — collaudo';button.type='button';
