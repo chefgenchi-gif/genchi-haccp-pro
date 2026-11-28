@@ -34,6 +34,20 @@ begin
     if sqlerrm not like 'Revisione ricetta superata%' then raise; end if;
   end;
 
+  begin
+    update SCHEMA_TEST.haccp_archive
+    set payload=jsonb_set(payload,'{data,Preparazione}','"Ricetta prova modificata"')
+    where owner_id=titolare and record_id='RIC-TEST';
+    begin
+      perform SCHEMA_TEST.haccp_registra_produzione(registrazione);
+      raise exception 'Contenuto modificato accettato con la vecchia approvazione';
+    exception when invalid_parameter_value then
+      if sqlerrm not like 'Procedura priva di validazione%' then raise; end if;
+    end;
+    raise exception 'Ripristina la ricetta di prova' using errcode='P0087';
+  exception when sqlstate 'P0087' then null;
+  end;
+
   if exists(select 1 from SCHEMA_TEST.avvisi_prelievo where owner_id=titolare) then
     raise exception 'Avviso generato per una revisione respinta';
   end if;
@@ -77,5 +91,5 @@ begin
   end;
 end;
 $$;
-select 'PASS revisione approvata e revisione errata respinta, rollback, un solo avviso, conflitto identificativo respinto, saldo zero, nuovo prelievo respinto' as esito;
+select 'PASS revisione approvata e revisione errata e contenuto modificato respinti, rollback, un solo avviso, conflitto identificativo respinto, saldo zero, nuovo prelievo respinto' as esito;
 rollback;
