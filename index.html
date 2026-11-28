@@ -591,10 +591,27 @@ render=function(){
 if(['Reparto','Categoria','Ricette e procedure'].includes(active))render();
 </script><script type="module">
 import { aggiungiAccessiRapidi } from './modules/accessi-rapidi.mjs';
+import { catalogoUbicazione, mostraCatalogoMagazzino, aggiungiCatalogoCarico } from './modules/catalogo-magazzini.mjs';
+
 const renderPrimaDegliAccessiRapidi=render;
 render=function(){
   renderPrimaDegliAccessiRapidi();
-  if(active==='Home')aggiungiAccessiRapidi($('panel'),go);
+  if (active === 'Home') aggiungiAccessiRapidi($('panel'), go);
+  if (active !== 'Cella' && active !== 'Ricevimento merci') return;
+
+  const storico = db.filter(riga => riga.module === 'Ricevimento merci').map(riga => ({
+    nome: riga.data.Prodotto,
+    ubicazione: locationOf(riga),
+    categoria: riga.data.Categoria,
+    stato: riga.data['Stato fisico'],
+  }));
+  const specie = speciePesce.map(([nome]) => nome);
+  if (active === 'Cella') {
+    mostraCatalogoMagazzino($('panel'), catalogoUbicazione(place, storico, specie));
+  } else {
+    const form = $('entry');
+    if (form) aggiungiCatalogoCarico(form, storico, specie);
+  }
 };
-if(active==='Home')render();
+if (['Home', 'Cella', 'Ricevimento merci'].includes(active)) render();
 </script></html>
