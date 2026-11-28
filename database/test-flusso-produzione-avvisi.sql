@@ -26,6 +26,19 @@ begin
   from SCHEMA_TEST.haccp_archive where owner_id=titolare and record_id='RIC-TEST';
 
   begin
+    perform SCHEMA_TEST.haccp_registra_produzione(
+      jsonb_set(registrazione,'{data,Revisione ricetta}','2')
+    );
+    raise exception 'Revisione superata accettata';
+  exception when invalid_parameter_value then
+    if sqlerrm not like 'Revisione ricetta superata%' then raise; end if;
+  end;
+
+  if exists(select 1 from SCHEMA_TEST.avvisi_prelievo where owner_id=titolare) then
+    raise exception 'Avviso generato per una revisione respinta';
+  end if;
+
+  begin
     perform SCHEMA_TEST.haccp_registra_produzione(registrazione);
     raise exception 'Annullamento della transazione di prova' using errcode='P0086';
   exception when sqlstate 'P0086' then null;
@@ -53,5 +66,5 @@ begin
   end;
 end;
 $$;
-select 'PASS revisione approvata, rollback, un solo avviso, saldo zero, nuovo prelievo respinto' as esito;
+select 'PASS revisione approvata e revisione errata respinta, rollback, un solo avviso, saldo zero, nuovo prelievo respinto' as esito;
 rollback;
