@@ -12,6 +12,7 @@ const archive = [{record_id:'FG-LOT-COLLAUDO',revision:1,payload:{
   id:'FG-LOT-COLLAUDO',module:'Produzione',at:new Date().toISOString(),data:{Preparazione:'Lotto sintetico'},
 }}];
 let rifiutaProssimoSalvataggio = true;
+let rispostaPersa = false;
 const server = createServer(async (req,res)=>{
   try {
     const url=new URL(req.url,'http://localhost');
@@ -24,7 +25,17 @@ const server = createServer(async (req,res)=>{
         }
         const chunks=[];
         for await(const chunk of req)chunks.push(chunk);
-        archive.push(...JSON.parse(Buffer.concat(chunks)));
+        const perdita=archive.length===2;
+        const rows=JSON.parse(Buffer.concat(chunks));
+        archive.push(...rows.map(row=>({...row,payload:{
+          ...row.payload,
+          data:Object.fromEntries(Object.entries(row.payload.data).reverse()),
+        }})));
+        if(perdita){
+          rispostaPersa=true;
+          res.writeHead(503).end();
+          return;
+        }
       }
       res.setHeader('Content-Type','application/json');
       res.end(JSON.stringify(archive));
@@ -90,6 +101,7 @@ try{
     await reopened.evaluate(m=>go(m),module);
     await reopened.locator('#archive').getByText('Operatore: OPERATORE-COLLAUDO-'+index,{exact:true}).waitFor();
   }
+  assert.ok(rispostaPersa);
   assert.deepEqual(dialogs,[]);
   assert.deepEqual(errors,[]);
   console.log('PASS: quattro registri salvati via HTTP e ritrovati dopo riapertura con profilo iPad.');

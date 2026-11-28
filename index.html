@@ -188,7 +188,15 @@ async function enter(user){
     }
   }catch{report('Sezione avvisi non disponibile. Ricaricare la pagina.');}
 }
-window.fgSyncSave=async()=>{if(!owner)return;pending=true;if(busy)return;busy=true;try{while(pending){pending=false;const batch=db.filter(r=>!known.has(r.id));if(batch.length){report('Salvataggio online in corso…');const {error}=await client.from('haccp_archive').insert(batch.map(r=>({owner_id:owner,record_id:r.id,module:r.module,payload:r})));if(error)throw error;batch.forEach(r=>known.add(r.id))}report('Registrazioni salvate online')}}catch(e){report('Salvataggio non riuscito: esportare il backup e premere Riprova.');}finally{busy=false}};
+window.fgSyncSave=async()=>{if(!owner)return;pending=true;if(busy)return;busy=true;try{while(pending){pending=false;const batch=db.filter(r=>!known.has(r.id));if(batch.length){report('Salvataggio online in corso…');const {error}=await client.from('haccp_archive').insert(batch.map(r=>({owner_id:owner,record_id:r.id,module:r.module,payload:r})));if(error){
+  // La risposta può andare persa dopo il commit: conferma solo copie identiche.
+  const canonico=value=>JSON.stringify(value,(_,item)=>
+    item && typeof item==='object' && !Array.isArray(item)
+      ? Object.fromEntries(Object.keys(item).sort().map(key=>[key,item[key]]))
+      : item);
+  const remoto=new Map((await readArchive()).map(row=>[row.record_id,row.payload]));
+  if(!batch.every(row=>canonico(remoto.get(row.id))===canonico(row)))throw error;
+}batch.forEach(r=>known.add(r.id))}report('Registrazioni salvate online')}}catch(e){report('Salvataggio non riuscito: esportare il backup e premere Riprova.');}finally{busy=false}};
 window.fgSaveOrder=async ordine=>{
   if(!owner||busy) throw Error('Attendere i salvataggi in corso.');
   if(db.some(r=>r.id!==ordine.id&&!known.has(r.id))) throw Error('Completare prima i salvataggi in sospeso.');
