@@ -62,6 +62,19 @@ begin
     raise exception 'Rollback incompleto';
   end if;
 
+  begin
+    perform SCHEMA_TEST.haccp_registra_produzione(
+      jsonb_set(registrazione,'{data,prelievi,LOT-Z-INESISTENTE}','1')
+    );
+    raise exception 'Produzione accettata con uno dei lotti assente';
+  exception when invalid_parameter_value then
+    if sqlerrm not like 'Lotto assente o non conforme%' then raise; end if;
+  end;
+  if exists(select 1 from SCHEMA_TEST.avvisi_prelievo where owner_id=titolare)
+     or exists(select 1 from SCHEMA_TEST.haccp_archive where owner_id=titolare and module='Produzione') then
+    raise exception 'Un lotto errato ha lasciato un prelievo parziale';
+  end if;
+
   perform SCHEMA_TEST.haccp_registra_produzione(registrazione);
   perform SCHEMA_TEST.haccp_registra_produzione(registrazione);
   begin
@@ -91,5 +104,5 @@ begin
   end;
 end;
 $$;
-select 'PASS revisione approvata e revisione errata e contenuto modificato respinti, rollback, un solo avviso, conflitto identificativo respinto, saldo zero, nuovo prelievo respinto' as esito;
+select 'PASS revisione approvata e revisione errata e contenuto modificato respinti, rollback, un solo avviso, conflitto identificativo respinto, nessun prelievo parziale, saldo zero, nuovo prelievo respinto' as esito;
 rollback;
